@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { addProgressEvent, autoPickNextTask, completeReviewRun, completeStep, completeUiTest, createFollowupTask, createTask, getBoardNotificationDigest, getTaskNotificationDigest, hasPassingReview, heartbeatRun, loadState, markRunStale, requestReviewRun, requestUiTest, transitionTask, updateTask } from './store'
+import type { ActivityEvent, DocSyncStatus, Priority, Task, TaskStatus, TaskType } from './types'
 
 const EXPORT_FILE_PATH = '/tmp/mission-control/state.json'
-import type { ActivityEvent, DocSyncStatus, Priority, Task, TaskStatus, TaskType } from './types'
 
 const columns: Array<{ key: TaskStatus; label: string }> = [
   { key: 'backlog', label: 'Backlog' },
@@ -250,6 +250,7 @@ export function App() {
           </div>
         </div>
         <p className="muted">Downloads a JSON snapshot that shell helpers can read now. Target file path for the bridge plan: {EXPORT_FILE_PATH}</p>
+        <p className="bridge-blocker">Current blocker: export is still a manual browser download, so shell tools cannot yet rely on {EXPORT_FILE_PATH} being refreshed automatically.</p>
       </section>
 
       {error && <div className="error-banner">{error}</div>}

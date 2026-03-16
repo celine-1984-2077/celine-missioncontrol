@@ -382,3 +382,12 @@ button.secondary {
   flex-direction: column;
   gap: 10px;
 }
+
+.bridge-blocker {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(245, 166, 35, 0.12);
+  border: 1px solid rgba(245, 166, 35, 0.24);
+  color: #f3d08b;
+}
