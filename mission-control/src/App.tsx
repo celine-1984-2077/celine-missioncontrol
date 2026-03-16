@@ -1,10 +1,8 @@
 import { useMemo, useState } from 'react'
-import { addProgressEvent, autoPickNextTask, completeReviewRun, completeStep, completeUiTest, createFollowupTask, createTask, getBoardNotificationDigest, getReviewEvidenceSummary, getTaskNotificationDigest, hasPassingReview, heartbeatRun, loadState, markRunStale, requestReviewRun, requestUiTest, transitionTask, updateTask } from './store'
+import { addProgressEvent, completeStep, completeUiTest, createTask, hasPassingReview, loadState, requestUiTest, transitionTask, updateTask } from './store'
 import type { ActivityEvent, DocSyncStatus, Priority, Task, TaskStatus, TaskType } from './types'
 
-const EXPORT_FILE_PATH = '/tmp/mission-control/state.json'
-
-const columns: Array<{ key: TaskStatus; label: string }> = [
+const columns: Array<{ key: 'backlog' | 'in_progress' | 'blocked' | 'done'; label: string }> = [
   { key: 'backlog', label: 'Backlog' },
   { key: 'in_progress', label: 'In Progress' },
   { key: 'blocked', label: 'Review' },
@@ -54,16 +52,12 @@ const initialDraft = {
   boundaries: '',
   type: 'code' as TaskType,
   priority: 'medium' as Priority,
-  status: 'triage' as TaskStatus,
+  status: 'backlog' as TaskStatus,
   requiresApproval: false,
   needsUiTest: true,
 }
 
 const navItems = ['Tasks', 'Content', 'Approvals', 'Council', 'Calendar', 'Docs', 'People', 'Todo', 'Office']
-
-function formatStatus(status: TaskStatus) {
-  return status.replace('_', ' ')
-}
 
 function formatRelativeish(value?: string) {
   if (!value) return '—'
@@ -83,58 +77,34 @@ export function App() {
   const [state, setState] = useState(() => loadState())
   const [selectedTaskId, setSelectedTaskId] = useState<string>(state.tasks[0]?.id ?? '')
   const [draft, setDraft] = useState(initialDraft)
-  const [progressText, setProgressText] = useState('')
-  const [progressNextStep, setProgressNextStep] = useState('')
-  const [error, setError] = useState<string>('')
-  const [reviewDraft, setReviewDraft] = useState({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '', targetUrl: 'http://127.0.0.1:4173/' })
+  const [detailDraft, setDetailDraft] = useState(() => createDetailDraft(state.tasks[0]))
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [error, setError] = useState('')
 
   const tasks = state.tasks
   const activity = state.activity
-  const runs = state.runs
   const nowRunning = useMemo(() => tasks.find((task) => task.status === 'in_progress'), [tasks])
-  const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? nowRunning ?? tasks[0]
-  const selectedTaskEvidence = selectedTask ? getReviewEvidenceSummary(state, selectedTask.id) : undefined
-  const doneDigest = tasks.filter((task) => task.status === 'done').slice(0, 3)
-  const boardDigest = getBoardNotificationDigest(state)
-  const selectedTaskDigest = selectedTask ? getTaskNotificationDigest(state, selectedTask.id) : undefined
-  const selectedTaskQaReady = selectedTask ? hasPassingReview(state, selectedTask.id, 'qa_review') : false
-  const selectedTaskUxReady = selectedTask ? (!selectedTask.requiresUxReview || hasPassingReview(state, selectedTask.id, 'ux_review')) : false
-  const missingEvidenceCount = runs.filter((run) =>
-    (run.kind === 'qa_review' || run.kind === 'ux_review') &&
-    run.status !== 'running' &&
-    !run.artifact?.screenshotPath &&
-    !run.artifact?.snapshotId &&
-    !(run.artifact?.evidenceLinks?.length),
-  ).length
-  const reviewRunsForTask = runs.filter((run) => run.taskId === selectedTask?.id && (run.kind === 'qa_review' || run.kind === 'ux_review'))
-  const latestReviewRuns = [...reviewRunsForTask].sort((a, b) => {
-    const aTime = a.endedAt ?? a.startedAt ?? ''
-    const bTime = b.endedAt ?? b.startedAt ?? ''
-    return bTime.localeCompare(aTime)
-  })
+  const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? tasks[0]
 
-  const [editDraft, setEditDraft] = useState(() => createEditDraft(selectedTask))
-
-  function syncEditDraft(task?: Task) {
-    setEditDraft(createEditDraft(task))
+  const stats = {
+    week: 48,
+    inProgress: tasks.filter((t) => t.status === 'in_progress').length,
+    total: tasks.length,
+    completion: `${Math.round((tasks.filter((t) => t.status === 'done').length / Math.max(1, tasks.length)) * 100)}%`,
   }
 
-  function handleSelectTask(taskId: string) {
-    setSelectedTaskId(taskId)
-    syncEditDraft(tasks.find((task) => task.id === taskId))
-    setProgressText('')
-    setProgressNextStep('')
-    setReviewDraft({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '', targetUrl: 'http://127.0.0.1:4173/' })
+  const boardTasks = {
+    backlog: tasks.filter((t) => t.status === 'backlog' || t.status === 'triage'),
+    in_progress: tasks.filter((t) => t.status === 'in_progress'),
+    blocked: tasks.filter((t) => t.status === 'blocked'),
+    done: tasks.filter((t) => t.status === 'done'),
   }
 
-  function handleTransition(taskId: string, nextStatus: TaskStatus) {
-    try {
-      setError('')
-      const nextState = transitionTask(state, taskId, nextStatus)
-      setState(nextState)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to transition task')
-    }
+  function openTask(task: Task) {
+    setSelectedTaskId(task.id)
+    setDetailDraft(createDetailDraft(task))
+    setShowDetailModal(true)
   }
 
   function handleCreateTask(event: React.FormEvent<HTMLFormElement>) {
@@ -154,110 +124,41 @@ export function App() {
       requiresApproval: draft.requiresApproval,
       needsUiTest: draft.needsUiTest,
     })
-    const created = nextState.tasks[0]
     setState(nextState)
-    setSelectedTaskId(created.id)
-    syncEditDraft(created)
     setDraft(initialDraft)
+    setShowCreateModal(false)
     setError('')
   }
 
-  function handleUpdateTask(event: React.FormEvent<HTMLFormElement>) {
+  function handleSaveDetail(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!selectedTask) return
     const nextState = updateTask(state, selectedTask.id, {
-      title: editDraft.title.trim(),
-      objective: editDraft.objective.trim(),
-      acceptanceCriteria: linesToArray(editDraft.acceptanceCriteria),
-      boundaries: linesToArray(editDraft.boundaries),
-      nextStep: editDraft.nextStep.trim(),
-      docSyncStatus: editDraft.docSyncStatus,
-      requiresSpecUpdate: editDraft.requiresSpecUpdate,
+      title: detailDraft.title.trim(),
+      objective: detailDraft.objective.trim(),
+      acceptanceCriteria: linesToArray(detailDraft.acceptanceCriteria),
+      boundaries: linesToArray(detailDraft.boundaries),
+      nextStep: detailDraft.nextStep.trim(),
+      docSyncStatus: detailDraft.docSyncStatus,
+      requiresSpecUpdate: detailDraft.requiresSpecUpdate,
     })
     setState(nextState)
+    setShowDetailModal(false)
   }
 
-  function handleProgressSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!selectedTask || !progressText.trim()) return
-    const nextState = addProgressEvent(state, selectedTask.id, progressText.trim(), progressNextStep.trim() || undefined)
-    setState(nextState)
-    setProgressText('')
-    setProgressNextStep('')
-  }
-
-  function handleCompleteStep(stepId: string) {
-    if (!selectedTask) return
-    setState(completeStep(state, selectedTask.id, stepId))
-  }
-
-  function submitReview(runId: string, outcome: 'pass' | 'fail' | 'submit') {
-    const nextState = completeReviewRun(state, runId, outcome, {
-      summary: reviewDraft.summary,
-      findings: reviewDraft.findings,
-      screenshotPath: reviewDraft.screenshotPath,
-      snapshotId: reviewDraft.snapshotId,
-      evidenceLinks: reviewDraft.evidenceLinks.split('\n').map((item) => item.trim()).filter(Boolean),
-      targetUrl: reviewDraft.targetUrl.trim(),
-    })
-    setState(nextState)
-    setReviewDraft({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '', targetUrl: 'http://127.0.0.1:4173/' })
-  }
-
-  function handleExportState() {
-    const payload = { tasks: state.tasks, runs: state.runs, activity: state.activity, exportedAt: new Date().toISOString(), sourceVersion: 'mission-control-local-v1', exportPathHint: EXPORT_FILE_PATH }
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'mission-control-state.json'
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
-  }
-
-  async function importReviewArtifactFromFile(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file) return
+  function handleTransition(taskId: string, nextStatus: TaskStatus) {
     try {
-      const raw = await file.text()
-      const parsed = JSON.parse(raw) as { url?: string; data?: { snapshot_id?: string; screenshot_path?: string } }
-      setReviewDraft((current) => ({
-        ...current,
-        targetUrl: parsed.url ?? current.targetUrl,
-        snapshotId: parsed.data?.snapshot_id ?? current.snapshotId,
-        screenshotPath: parsed.data?.screenshot_path ?? current.screenshotPath,
-        evidenceLinks: [current.evidenceLinks, file.name].filter(Boolean).join('\n'),
-      }))
-      setError('')
+      const nextState = transitionTask(state, taskId, nextStatus)
+      setState(nextState)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to import review artifact JSON')
-    } finally {
-      event.target.value = ''
+      setError(err instanceof Error ? err.message : 'Failed to transition task')
     }
   }
 
-  async function copyText(text: string) {
-    try { await navigator.clipboard.writeText(text) } catch (err) { setError(err instanceof Error ? err.message : 'Failed to copy text') }
-  }
-
-  function formatDigestForCopy(headline: string, lines: string[], nextAction?: string) {
-    return [`**${headline}**`, ...lines.map((line) => `- ${line}`), ...(nextAction ? [`- next_action: ${nextAction}`] : [])].join('\n')
-  }
-
-  const stats = {
-    week: 48,
-    inProgress: tasks.filter((t) => t.status === 'in_progress').length,
-    total: tasks.length,
-    completion: `${Math.round((tasks.filter((t) => t.status === 'done').length / Math.max(1, tasks.length)) * 100)}%`,
-  }
-
-  const boardTasks = {
-    backlog: tasks.filter((t) => t.status === 'backlog' || t.status === 'triage'),
-    in_progress: tasks.filter((t) => t.status === 'in_progress'),
-    blocked: tasks.filter((t) => t.status === 'blocked'),
-    done: tasks.filter((t) => t.status === 'done'),
+  function addQuickLog(message: string) {
+    if (!selectedTask) return
+    const nextState = addProgressEvent(state, selectedTask.id, message)
+    setState(nextState)
   }
 
   return (
@@ -285,31 +186,17 @@ export function App() {
             <span className="pill">🌙 Dark</span>
             <span className="pill">EN</span>
             <button className="secondary">Run Smoke Test</button>
-            <button>+ New Task</button>
+            <button onClick={() => setShowCreateModal(true)}>+ New Task</button>
           </div>
         </header>
+
+        {error && <div className="error-banner">{error}</div>}
 
         <section className="stats-strip card-shell">
           <StatBig label="This week" value={String(stats.week)} accent="green" />
           <StatBig label="In progress" value={String(stats.inProgress)} accent="blue" />
           <StatBig label="Total" value={String(stats.total)} accent="white" />
           <StatBig label="Completion" value={stats.completion} accent="purple" />
-        </section>
-
-        <section className="filters-row card-shell">
-          <div className="chips-row">
-            <span className="pill active-chip">All</span>
-            <span className="pill">Scan</span>
-            <span className="pill">Progress</span>
-            <span className="pill">Done</span>
-            <span className="pill">All projects</span>
-            <span className="pill">Stale &lt; 45m</span>
-          </div>
-          <div className="chips-row muted small">
-            <span>Autopilot scans backlog every 1m</span>
-            <span>Last refresh: {formatRelativeish(activity[0]?.createdAt)}</span>
-            <span>Next scan: 52s</span>
-          </div>
         </section>
 
         <section className="board-and-activity">
@@ -320,7 +207,7 @@ export function App() {
                   <div className="kanban-header">{column.label}</div>
                   <div className="kanban-body">
                     {(boardTasks[column.key as keyof typeof boardTasks] ?? []).map((task) => (
-                      <article key={task.id} className={`kanban-card ${selectedTask?.id === task.id ? 'selected-card' : ''}`} onClick={() => handleSelectTask(task.id)}>
+                      <article key={task.id} className={`kanban-card ${selectedTask?.id === task.id ? 'selected-card' : ''}`} onClick={() => openTask(task)}>
                         <h3>{task.title}</h3>
                         <div className="kanban-meta">
                           <span>Objective</span>
@@ -328,7 +215,7 @@ export function App() {
                         </div>
                         <div className="kanban-meta">
                           <span>Plan</span>
-                          <p>{task.plan.slice(0, 3).map((step, idx) => `${idx + 1}) ${step.label}`).join('\n')}</p>
+                          <p>{task.plan.slice(0, 2).map((step, idx) => `${idx + 1}) ${step.label}`).join('\n')}</p>
                         </div>
                         <div className="card-signal compact"><strong>Next:</strong> {task.nextStep ?? 'Next step pending…'}</div>
                         {task.blockerDetail && <div className="card-signal blocker-signal"><strong>Blocked:</strong> {task.blockerDetail}</div>}
@@ -374,6 +261,94 @@ export function App() {
           </aside>
         </section>
       </main>
+
+      {showCreateModal && (
+        <div className="overlay" onClick={() => setShowCreateModal(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="panel-heading"><h3>New Task</h3><button className="secondary" onClick={() => setShowCreateModal(false)}>Close</button></div>
+            <form className="detail-form" onSubmit={handleCreateTask}>
+              <label><span>Title</span><input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></label>
+              <label><span>Objective</span><textarea rows={3} value={draft.objective} onChange={(e) => setDraft({ ...draft, objective: e.target.value })} /></label>
+              <label><span>Acceptance Criteria</span><textarea rows={4} value={draft.acceptanceCriteria} onChange={(e) => setDraft({ ...draft, acceptanceCriteria: e.target.value })} /></label>
+              <label><span>Boundaries</span><textarea rows={3} value={draft.boundaries} onChange={(e) => setDraft({ ...draft, boundaries: e.target.value })} /></label>
+              <div className="two-col">
+                <label><span>Status</span><select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as TaskStatus })}><option value="backlog">backlog</option><option value="triage">triage</option><option value="blocked">blocked</option></select></label>
+                <label><span>Priority</span><select value={draft.priority} onChange={(e) => setDraft({ ...draft, priority: e.target.value as Priority })}><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="urgent">urgent</option></select></label>
+              </div>
+              <div className="two-col">
+                <label className="checkbox-row"><input type="checkbox" checked={draft.needsUiTest} onChange={(e) => setDraft({ ...draft, needsUiTest: e.target.checked })} /><span>Needs UI test</span></label>
+                <label className="checkbox-row"><input type="checkbox" checked={draft.requiresApproval} onChange={(e) => setDraft({ ...draft, requiresApproval: e.target.checked })} /><span>Requires approval</span></label>
+              </div>
+              <div className="actions-row"><button type="submit">Create Task</button></div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showDetailModal && selectedTask && (
+        <div className="overlay" onClick={() => setShowDetailModal(false)}>
+          <div className="modal-card detail-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="panel-heading">
+              <div>
+                <h3>{selectedTask.title}</h3>
+                <p className="muted">{selectedTask.status === 'in_progress' ? 'Execution view' : selectedTask.status === 'backlog' || selectedTask.status === 'triage' ? 'Backlog editor' : 'Task detail'}</p>
+              </div>
+              <button className="secondary" onClick={() => setShowDetailModal(false)}>Close</button>
+            </div>
+
+            {(selectedTask.status === 'backlog' || selectedTask.status === 'triage') ? (
+              <form className="detail-form" onSubmit={handleSaveDetail}>
+                <label><span>Title</span><input value={detailDraft.title} onChange={(e) => setDetailDraft({ ...detailDraft, title: e.target.value })} /></label>
+                <label><span>Objective</span><textarea rows={3} value={detailDraft.objective} onChange={(e) => setDetailDraft({ ...detailDraft, objective: e.target.value })} /></label>
+                <label><span>Acceptance Criteria</span><textarea rows={4} value={detailDraft.acceptanceCriteria} onChange={(e) => setDetailDraft({ ...detailDraft, acceptanceCriteria: e.target.value })} /></label>
+                <label><span>Boundaries</span><textarea rows={3} value={detailDraft.boundaries} onChange={(e) => setDetailDraft({ ...detailDraft, boundaries: e.target.value })} /></label>
+                <label><span>Next step</span><input value={detailDraft.nextStep} onChange={(e) => setDetailDraft({ ...detailDraft, nextStep: e.target.value })} /></label>
+                <div className="actions-row"><button type="submit">Save</button></div>
+              </form>
+            ) : (
+              <div className="detail-readonly">
+                <section className="detail-section">
+                  <h3>Objective</h3>
+                  <p>{selectedTask.objective}</p>
+                </section>
+                <section className="detail-section">
+                  <h3>Acceptance Criteria</h3>
+                  <ul>{selectedTask.acceptanceCriteria.map((item) => <li key={item}>{item}</li>)}</ul>
+                </section>
+                <section className="detail-section">
+                  <h3>Execution Log</h3>
+                  <div className="stale-list">
+                    {activity.filter((event) => event.taskId === selectedTask.id).slice(0, 8).map((event) => (
+                      <div key={event.id} className="stale-item">
+                        <span className={`dot ${eventTone[event.type] ?? 'tone-slate'}`} />
+                        <div>
+                          <strong>{event.title}</strong>
+                          <p>{event.body ?? 'No details'}</p>
+                          <span className="muted small">{formatRelativeish(event.createdAt)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+                {selectedTask.status === 'in_progress' && (
+                  <div className="actions-row wrap">
+                    <button onClick={() => addQuickLog('Progress check from detail modal.')}>Add log</button>
+                    <button className="secondary" onClick={() => setState(completeStep(state, selectedTask.plan.find((s) => s.status !== 'done')?.id || selectedTask.plan[0].id ? selectedTask.id : selectedTask.id, selectedTask.plan.find((s) => s.status !== 'done')?.id || selectedTask.plan[0].id))}>Complete next step</button>
+                    {transitionTargets[selectedTask.status].map((nextStatus) => <button key={nextStatus} className="secondary" onClick={() => handleTransition(selectedTask.id, nextStatus)}>Move to {nextStatus}</button>)}
+                  </div>
+                )}
+                {selectedTask.needsUiTest && (
+                  <div className="actions-row wrap">
+                    <button onClick={() => setState(requestUiTest(state, selectedTask.id))}>Start browser test</button>
+                    <button className="secondary" onClick={() => setState(completeUiTest(state, selectedTask.id, true))}>Mark browser test passed</button>
+                    <button className="secondary" onClick={() => setState(completeUiTest(state, selectedTask.id, false))}>Mark browser test failed</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -382,7 +357,7 @@ function linesToArray(text: string) {
   return text.split('\n').map((item) => item.trim()).filter(Boolean)
 }
 
-function createEditDraft(task?: Task) {
+function createDetailDraft(task?: Task) {
   return {
     title: task?.title ?? '',
     objective: task?.objective ?? '',
@@ -396,12 +371,4 @@ function createEditDraft(task?: Task) {
 
 function StatBig({ label, value, accent }: { label: string; value: string; accent: string }) {
   return <div className={`stat-big ${accent}`}><strong>{value}</strong><span>{label}</span></div>
-}
-
-function InfoCard({ title, value }: { title: string; value: string }) {
-  return <article className="artifact-item"><strong>{title}</strong><p>{value}</p></article>
-}
-
-function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return <section className="detail-section"><h3>{title}</h3>{children}</section>
 }
