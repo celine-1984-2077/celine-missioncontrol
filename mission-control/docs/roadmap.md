@@ -44,6 +44,7 @@ Advance Mission Control from a local board prototype into an autonomous review/d
 ### 5. Spec/docs sync
 - keep README, roadmap, and harness docs aligned with what the local prototype actually does
 - document blockers whenever a real integration path is missing
+- maintain `docs/state-export-bridge.md` as the short-term plan for escaping browser-only state
 
 ## Known blockers
 

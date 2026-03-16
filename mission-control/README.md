@@ -29,6 +29,7 @@ Current state:
 - review findings can promote improvement/spec-update follow-up tasks
 - initial local browser-review harness is documented under `docs/browser-review-harness.md`
 - roadmap/status is tracked in `docs/roadmap.md`
+- short-term export/import path is documented in `docs/state-export-bridge.md`
 - state transitions are validated against the canonical state machine
 - activity entries are generated from task creation, edits, transitions, progress updates, runner actions, and browser-test actions
 

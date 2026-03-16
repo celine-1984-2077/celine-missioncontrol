@@ -59,6 +59,7 @@ UX review expectation:
 Notification bridge:
 - `npm run --workspace mission-control digest` renders Discord-friendly bullet output from JSON task/run/activity state
 - current blocker: this helper still reads a sample/exported state file rather than the browser-local runtime store
+- next bridge plan is documented in `docs/state-export-bridge.md`
 
 ## What the harness should support next
 
