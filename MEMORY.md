@@ -60,3 +60,5 @@ Other planned website areas:
 - For uncertain details, I should ask clarification questions instead of guessing.
 - Tony wants a persistent project markdown file to track ideas, understanding, and breakdowns for the personal system website.
 - Tony wants the read-spec / update-spec mechanism to apply not just to Mission Control, but to every project developed through it.
+- Tony wants us to explicitly track two parallel things: (1) OpenClaw protocol/configuration patterns and (2) Mission Control product/application design and development.
+- Tony wants a future split between a public/shareable starter version and a personal plugin/customization layer for his own workflows (for example, French learning and other personal modules).

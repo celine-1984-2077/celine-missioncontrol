@@ -26,6 +26,26 @@ The core system should support:
 - One browser-testing session per UI task after implementation
 - Automatic bug creation when QA/testing fails
 - A self-reinforcing loop where failed work goes back into backlog/triage until resolved
+- Multi-session collaboration for important work:
+  - builder/executor session
+  - QA validation session
+  - designer/UX review session
+
+## 2.1 Two parallel tracks we are designing
+
+We are not only building one thing.
+We are designing two linked systems at the same time:
+
+1. **OpenClaw protocol / configuration layer**
+   - reusable project protocols
+   - spec/doc sync behavior
+   - project bootstrap rules
+   - future packaging for public sharing
+
+2. **Mission Control product layer**
+   - board, docs, activity, runs, QA loop, notifications, and project import workflows
+
+Both need to be documented explicitly.
 
 ## 3. Product Model
 
@@ -198,4 +218,6 @@ Implement:
 1. Confirm whether `Blocked` should be a first-class visible column.
 2. Confirm whether `Testing` should appear in the UI as a badge/phase even if not a canonical status.
 3. Confirm what minimum task fields are required at creation time.
+4. Confirm whether docs are phase-1 UI or phase-2 after execution backbone lands.
+ minimum task fields are required at creation time.
 4. Confirm whether docs are phase-1 UI or phase-2 after execution backbone lands.

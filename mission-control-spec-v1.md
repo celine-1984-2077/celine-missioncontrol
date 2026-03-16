@@ -17,7 +17,47 @@ The first version focuses on a reliable execution loop for:
 
 This v1 does **not** try to solve every future personal-system feature yet.
 
+It should also be designed so it can later split into:
+- a public/shareable starter version for other OpenClaw users
+- a personal extension/plugin layer for Tony-specific workflows
+
 ---
+
+## 1.1 Two parallel product surfaces
+
+We are designing two linked systems at the same time:
+
+1. **OpenClaw protocol/config layer**
+   - project bootstrap rules
+   - spec/doc sync rules
+   - reusable operating conventions
+   - future packaging for public sharing
+
+2. **Mission Control application layer**
+   - tasks
+   - activity
+   - docs
+   - runs
+   - QA loop
+   - notifications
+   - project import and analysis workflows
+
+Both should be documented explicitly.
+
+## 1.2 Product distribution model
+
+Mission Control should evolve toward two flavors:
+
+### Public starter
+- shareable repo/toolkit
+- opinionated defaults
+- immediate usability for new users
+- supports importing an existing project and bootstrapping docs/specs/protocols
+
+### Personal extension layer
+- Tony-specific workflows and content
+- examples: French study tools, article imports, personal memory modules
+- best treated as plugins/modules/extensions rather than bundled into the public starter core
 
 ## 2. Core Product Model
 
@@ -26,6 +66,7 @@ This v1 does **not** try to solve every future personal-system feature yet.
 - **Task** = unit of execution
 - **Doc** = durable knowledge / runbook / decision record
 - **Activity** = event stream showing what happened
+- **Protocol** = reusable OpenClaw/Mission Control operating rules
 
 ### 2.2 Canonical task states
 
@@ -175,7 +216,7 @@ A task can have many historical runs, but only one active run.
 Run {
   id: string
   taskId: string
-  kind: 'execution' | 'ui_test'
+  kind: 'execution' | 'ui_test' | 'qa_review' | 'ux_review'
   status: 'queued' | 'running' | 'passed' | 'failed' | 'cancelled'
 
   sessionRef?: string
@@ -219,6 +260,12 @@ ActivityEvent {
     | 'ui_test_started'
     | 'ui_test_passed'
     | 'ui_test_failed'
+    | 'qa_review_requested'
+    | 'qa_review_passed'
+    | 'qa_review_failed'
+    | 'ux_review_requested'
+    | 'ux_review_submitted'
+    | 'spec_update_requested'
     | 'bug_created'
     | 'done'
     | 'notification_sent'
@@ -325,6 +372,57 @@ If UI test fails:
   - bug task enters `triage`
 
 ---
+
+## 8.5 Multi-session collaboration model
+
+For important implementation work, especially UI-facing work, Mission Control should support separate sessions/runs for:
+
+1. **execution**
+   - builds the feature
+2. **ui_test / QA validation**
+   - verifies what was actually implemented
+   - should inspect the resulting behavior, not just trust builder summaries
+3. **ux_review**
+   - evaluates usability, visual hierarchy, and interaction clarity
+
+### 8.5.1 Why this separation matters
+
+A builder session should not be the only authority on whether work is complete.
+
+Key rule:
+- **implemented != validated**
+
+A task may be implemented, but until QA/browser validation passes, it is not validated.
+
+### 8.5.2 QA session responsibilities
+
+A QA session should receive:
+- task id
+- objective
+- acceptance criteria
+- builder summary
+- changed files / changed surfaces
+- URL or page to test
+- expected flows
+
+A QA session should return:
+- pass / fail / partial
+- verified behaviors
+- unverified behaviors
+- reproduction notes
+- artifact references when available
+- whether a bug or spec-update task should be created
+
+### 8.5.3 UX review responsibilities
+
+A UX review session should evaluate:
+- usability
+- information hierarchy
+- visual clarity
+- confusing interactions
+- what should be must-fix vs polish
+
+UX findings should not automatically equal bugs; some should become improvement tasks.
 
 ## 9. Notification Contract
 
@@ -529,6 +627,35 @@ No silent failure.
 If a run crashes or disappears, Mission Control should eventually detect stale runs and surface them as blocked or errored.
 
 ---
+
+## 13.1 Roadmap status in project specs
+
+Every project spec should include a roadmap/progress section showing what has reached each stage.
+
+Recommended stages:
+- planned
+- in_progress
+- implemented
+- validated
+- shipped
+- blocked
+
+This distinction is important because:
+- implemented does not automatically mean validated
+- validated does not always mean shipped
+
+Recommended format: checklist or status table by phase/workstream.
+
+## 13.2 Imported project bootstrap expectation
+
+When a user imports an existing project into Mission Control, the system should eventually help generate:
+- initial project spec
+- project AGENTS/protocol file
+- runbook / playbook drafts
+- database doc drafts if relevant
+- service/system analysis docs if relevant
+
+These should appear in the docs surface and become editable, linked project knowledge.
 
 ## 14. MVP Success Criteria
 
