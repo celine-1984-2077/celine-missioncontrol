@@ -373,51 +373,6 @@ export function App() {
             </div>
           </aside>
         </section>
-
-        <section className="lower-grid">
-          <section className="card-shell attention-panel">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">Needs Attention</p>
-                <h2>What needs action now</h2>
-              </div>
-            </div>
-            <div className="attention-list">
-              <div className="attention-row"><strong>Blocked</strong><span>{tasks.filter((task) => task.status === 'blocked').length}</span></div>
-              <div className="attention-row"><strong>Pending UX</strong><span>{tasks.filter((task) => task.requiresUxReview && !hasPassingReview(state, task.id, 'ux_review')).length}</span></div>
-              <div className="attention-row"><strong>Missing Evidence</strong><span>{missingEvidenceCount}</span></div>
-            </div>
-          </section>
-
-          <section className="card-shell details-panel">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">Task Detail</p>
-                <h2>{selectedTask?.title}</h2>
-              </div>
-              <div className="chips-row">
-                {selectedTask && <span className={`pill ${statusTone[selectedTask.status]}`}>{formatStatus(selectedTask.status)}</span>}
-                {selectedTask?.requiresUxReview && <span className={`pill ${selectedTaskUxReady ? 'tone-green' : 'tone-amber'}`}>ux {selectedTaskUxReady ? 'ready' : 'required'}</span>}
-              </div>
-            </div>
-
-            {selectedTask && (
-              <div className="detail-stack">
-                <div className="overview-grid">
-                  <InfoCard title="Status" value={formatStatus(selectedTask.status)} />
-                  <InfoCard title="Next step" value={selectedTask.nextStep ?? 'Not set'} />
-                  <InfoCard title="Needs Tony?" value={selectedTask.requiresApproval ? 'Approval required' : selectedTask.blockerDetail ? 'Check blocker' : 'No'} />
-                  <InfoCard title="Latest evidence" value={selectedTaskEvidence?.latestEvidenceLabel ?? 'No evidence yet'} />
-                </div>
-
-                <div className="read-sections">
-                  <DetailSection title="Objective"><p>{selectedTask.objective}</p></DetailSection>
-                  <DetailSection title="Acceptance Criteria"><ul>{selectedTask.acceptanceCriteria.map((item) => <li key={item}>{item}</li>)}</ul></DetailSection>
-                </div>
-              </div>
-            )}
-          </section>
-        </section>
       </main>
     </div>
   )
