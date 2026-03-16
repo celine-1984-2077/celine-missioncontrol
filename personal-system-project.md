@@ -92,27 +92,30 @@ Implication:
 - `TuanInsurance/` exists in the workspace and appears to be the current insurance project codebase.
 - It includes docs for app overview, schema, deployment, and test suites.
 
-### 5.2 Prior Mission Control work (from Tony's shared screenshots/text)
+### 5.2 Prior Mission Control work status
 
-Already explored in some earlier version:
-- task board UI
-- docs view
-- activity panel
-- project-tagging ideas
-- protocol for structured execution reporting
+Tony confirmed the earlier Mission Control code is completely gone.
 
-Unknown:
-- where the prior Mission Control code currently lives
-- whether it still exists in another repo/branch/archive
-- whether the current desired implementation should rebuild from scratch or recover/adapt previous work
+Implication:
+- We should treat this as a fresh rebuild.
+- The useful surviving assets are the remembered product ideas, workflow lessons, and UX/protocol decisions.
 
-## 6. Proposed Build Plan
+## 6. Confirmed Decisions (2026-03-15)
 
-### Phase 0 — Recovery / audit
+- The personal system website should be built as its **own separate repo/folder**.
+- The first implementation should focus **only on Mission Control itself**.
+- We can use the process of building Mission Control to calibrate how Tony and Celine work together.
+- Discord notifications should target **`céline-notification`**.
 
-1. Inspect the workspace for any prior Mission Control code, branches, snapshots, or docs.
-2. Identify whether TuanInsurance is separate from the personal-system website or whether the Mission Control UI was embedded elsewhere.
-3. Capture current architecture options before writing new code.
+## 7. Proposed Build Plan
+
+### Phase 0 — Product spec + fresh repo bootstrap
+
+1. Create a new standalone repo/folder for Mission Control.
+2. Write the workflow spec before building automation.
+3. Choose the canonical task state model.
+4. Decide approval/autostart policy for triage.
+5. Capture architecture options for execution, notifications, and QA.
 
 ### Phase 1 — Workflow spec (make it hard, not vague)
 
@@ -170,24 +173,29 @@ Implement:
 4. runbooks
 5. later Notion sync
 
-## 7. Immediate Next Steps I Recommend
+## 8. Immediate Next Steps I Recommend
 
-1. **Recover the old work first**
-   - search workspace/git history for prior Mission Control implementation
-2. **Confirm the canonical state model**
-   - decide whether Testing is a board column or internal execution phase
+1. **Lock the state model**
+   - my current recommendation is:
+     - Backlog
+     - Triage
+     - In Progress
+     - Blocked
+     - Done
+   - and treat `Review` + `Testing` as typed phases/events, not long-lived board columns
+2. **Lock the triage pickup policy**
+   - my current recommendation is:
+     - default: triage items can auto-start
+     - optional flag: `requiresApproval=true` for sensitive / ambiguous / external tasks
 3. **Write the workflow spec**
-   - tasks, events, notifications, QA contracts
-4. **Map the automation architecture**
+   - tasks, events, notifications, QA contracts, bug creation rules
+4. **Create the new standalone repo/folder**
+5. **Then start coding the execution backbone first**
    - cron -> scan -> session -> update -> test -> notify -> bug-create
-5. **Only then start coding**
-   - to avoid rebuilding the same instability
 
-## 8. Clarifications to Ask Tony
+## 9. Open Design Choices
 
-1. Where did the earlier Mission Control code live? Same repo, another repo, or a deleted workspace only?
-2. Do you want the personal system website in its own repo/folder now, or inside an existing project?
-3. Should `Testing` be a visible board column, or just a system phase under `In Progress`?
-4. What is the exact Discord destination for notifications right now (channel/session/workflow)?
-5. Do you want the system to auto-start work from triage with no manual approval, or should some tasks require approval gates?
-6. Should the first implementation focus only on Mission Control itself, or also connect immediately to TuanInsurance tasks as a real client project?
+1. Confirm whether `Blocked` should be a first-class visible column.
+2. Confirm whether `Testing` should appear in the UI as a badge/phase even if not a canonical status.
+3. Confirm what minimum task fields are required at creation time.
+4. Confirm whether docs are phase-1 UI or phase-2 after execution backbone lands.

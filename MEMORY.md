@@ -21,10 +21,12 @@ Core near-term priority:
 - Build a reliable self-development + QA + notification framework.
 - Main control surface is a task-management board (Mission Control / kanban-style).
 - Desired flow: backlog ideas -> triage queue -> in progress -> done, with automated scanning and execution.
-- Every task should produce visible state updates and notifications in Tony's Discord Celine notification channel.
+- Every task should produce visible state updates and notifications in Tony's Discord `céline-notification` channel.
 - Each task should run in its own session.
 - Any code task with UI/user interaction should trigger a dedicated browser-testing session.
 - If testing fails, create a bug item and feed it back into the board so the system can self-loop.
+- The personal system website should live in its own separate repo/folder.
+- The first implementation should focus only on Mission Control itself.
 
 Other planned website areas:
 - Project docs / runbooks / durable project memory
