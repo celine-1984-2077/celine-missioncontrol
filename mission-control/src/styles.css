@@ -391,3 +391,12 @@ button.secondary {
   border: 1px solid rgba(245, 166, 35, 0.24);
   color: #f3d08b;
 }
+
+.ux-review-reminder {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(85, 147, 255, 0.12);
+  border: 1px solid rgba(85, 147, 255, 0.24);
+  color: #b9d2ff;
+}

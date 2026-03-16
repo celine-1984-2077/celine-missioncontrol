@@ -397,6 +397,9 @@ export function App() {
                   <strong>Browser review command</strong>
                   <code>./mission-control/scripts/browser-review.sh {reviewDraft.targetUrl || 'http://127.0.0.1:4173/'}</code>
                   <p className="muted">Run the harness, then paste the screenshot path, snapshot ID, and any evidence links back here.</p>
+                  {selectedTask.requiresUxReview && !selectedTaskUxReady && (
+                    <p className="ux-review-reminder">UX review is still required for this task. Don’t stop at QA pass only.</p>
+                  )}
                 </div>
                 <div className="actions-row wrap">
                   {runs.filter((run) => run.taskId === selectedTask.id && run.status === 'running' && (run.kind === 'qa_review' || run.kind === 'ux_review')).map((run) => (
