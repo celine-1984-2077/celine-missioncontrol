@@ -39,6 +39,18 @@ Optional custom URL:
 ./mission-control/scripts/browser-review.sh http://127.0.0.1:4173/
 ```
 
+The harness now saves:
+- annotated screenshot path
+- raw `peekaboo see --json` artifact file
+- `latest.json` convenience pointer for the newest capture
+- snapshot id echoed in terminal for follow-up review/test actions
+
+Recommended review loop:
+1. run the harness against the local app
+2. paste screenshot path, snapshot id, target URL, and any evidence links into the Mission Control review form
+3. submit QA or UX review result
+4. create follow-up improvement/spec-update tasks when findings require it
+
 ## What the harness should support next
 
 ### QA browser review

@@ -36,6 +36,8 @@ export interface ReviewArtifact {
   evidenceLinks?: string[]
   reviewSummary?: string
   findings?: string
+  targetUrl?: string
+  capturedAt?: string
 }
 
 export interface Run {

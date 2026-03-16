@@ -47,6 +47,7 @@ export interface ReviewSubmissionInput {
   screenshotPath?: string
   snapshotId?: string
   evidenceLinks?: string[]
+  targetUrl?: string
 }
 
 export function loadState(): MissionControlState {
@@ -609,6 +610,8 @@ export function completeReviewRun(
           evidenceLinks: submission.evidenceLinks,
           reviewSummary: submission.summary,
           findings: submission.findings,
+          targetUrl: submission.targetUrl,
+          capturedAt: now,
         }
       : run.artifact,
   }
@@ -689,8 +692,22 @@ export function completeReviewRun(
     })
   }
 
+  const updatedTasks = task
+    ? state.tasks.map((item) =>
+        item.id === task.id
+          ? {
+              ...item,
+              reviewSummary: submission?.summary ?? item.reviewSummary,
+              evidenceLinks: submission?.evidenceLinks?.length ? submission.evidenceLinks : item.evidenceLinks,
+              updatedAt: submission ? now : item.updatedAt,
+              lastEventAt: submission ? now : item.lastEventAt,
+            }
+          : item,
+      )
+    : state.tasks
+
   return commit({
-    tasks: [...extraTasks, ...state.tasks],
+    tasks: [...extraTasks, ...updatedTasks],
     runs: state.runs.map((item) => (item.id === runId ? updatedRun : item)),
     activity: [...extraEvents.reverse(), ...state.activity],
   })

@@ -69,7 +69,7 @@ export function App() {
   const [progressText, setProgressText] = useState('')
   const [progressNextStep, setProgressNextStep] = useState('')
   const [error, setError] = useState<string>('')
-  const [reviewDraft, setReviewDraft] = useState({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '' })
+  const [reviewDraft, setReviewDraft] = useState({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '', targetUrl: 'http://127.0.0.1:4173/' })
 
   const tasks = state.tasks
   const activity = state.activity
@@ -77,6 +77,12 @@ export function App() {
   const nowRunning = useMemo(() => tasks.find((task) => task.status === 'in_progress'), [tasks])
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? nowRunning ?? tasks[0]
   const doneDigest = tasks.filter((task) => task.status === 'done').slice(0, 3)
+  const reviewRunsForTask = runs.filter((run) => run.taskId === selectedTask?.id && (run.kind === 'qa_review' || run.kind === 'ux_review'))
+  const latestReviewRuns = [...reviewRunsForTask].sort((a, b) => {
+    const aTime = a.endedAt ?? a.startedAt ?? ''
+    const bTime = b.endedAt ?? b.startedAt ?? ''
+    return bTime.localeCompare(aTime)
+  })
 
   const [editDraft, setEditDraft] = useState(() => createEditDraft(selectedTask))
 
@@ -89,7 +95,7 @@ export function App() {
     syncEditDraft(tasks.find((task) => task.id === taskId))
     setProgressText('')
     setProgressNextStep('')
-    setReviewDraft({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '' })
+    setReviewDraft({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '', targetUrl: 'http://127.0.0.1:4173/' })
   }
 
   function handleTransition(taskId: string, nextStatus: TaskStatus) {
@@ -151,7 +157,7 @@ export function App() {
     setState(nextState)
     setProgressText('')
     setProgressNextStep('')
-    setReviewDraft({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '' })
+    setReviewDraft({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '', targetUrl: 'http://127.0.0.1:4173/' })
   }
 
   function handleCompleteStep(stepId: string) {
@@ -171,9 +177,10 @@ export function App() {
         .split('\n')
         .map((item) => item.trim())
         .filter(Boolean),
+      targetUrl: reviewDraft.targetUrl.trim(),
     })
     setState(nextState)
-    setReviewDraft({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '' })
+    setReviewDraft({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '', targetUrl: 'http://127.0.0.1:4173/' })
   }
 
   return (
@@ -324,11 +331,17 @@ export function App() {
             <DetailSection title="Progress Log"><ul>{activity.filter((event) => event.taskId === selectedTask.id).map((event) => <li key={event.id}><strong>{event.title}</strong>{event.body ? ` — ${event.body}` : ''}</li>)}</ul></DetailSection>
             <DetailSection title="Review Result Form">
               <form className="detail-form">
+                <label><span>Target URL</span><input value={reviewDraft.targetUrl} onChange={(e) => setReviewDraft({ ...reviewDraft, targetUrl: e.target.value })} placeholder="http://127.0.0.1:4173/" /></label>
                 <label><span>Review summary</span><textarea rows={3} value={reviewDraft.summary} onChange={(e) => setReviewDraft({ ...reviewDraft, summary: e.target.value })} /></label>
                 <label><span>Findings</span><textarea rows={4} value={reviewDraft.findings} onChange={(e) => setReviewDraft({ ...reviewDraft, findings: e.target.value })} /></label>
                 <label><span>Screenshot path</span><input value={reviewDraft.screenshotPath} onChange={(e) => setReviewDraft({ ...reviewDraft, screenshotPath: e.target.value })} placeholder="/tmp/...png" /></label>
                 <label><span>Snapshot ID</span><input value={reviewDraft.snapshotId} onChange={(e) => setReviewDraft({ ...reviewDraft, snapshotId: e.target.value })} /></label>
                 <label><span>Evidence links (one per line)</span><textarea rows={3} value={reviewDraft.evidenceLinks} onChange={(e) => setReviewDraft({ ...reviewDraft, evidenceLinks: e.target.value })} /></label>
+                <div className="artifact-callout">
+                  <strong>Browser review command</strong>
+                  <code>./mission-control/scripts/browser-review.sh {reviewDraft.targetUrl || 'http://127.0.0.1:4173/'}</code>
+                  <p className="muted">Run the harness, then paste the screenshot path, snapshot ID, and any evidence links back here.</p>
+                </div>
                 <div className="actions-row wrap">
                   {runs.filter((run) => run.taskId === selectedTask.id && run.status === 'running' && (run.kind === 'qa_review' || run.kind === 'ux_review')).map((run) => (
                     <div key={run.id} className="transition-row">
@@ -343,9 +356,39 @@ export function App() {
                 </div>
               </form>
             </DetailSection>
+            <DetailSection title="Review Artifacts">
+              {latestReviewRuns.length ? (
+                <div className="artifact-list">
+                  {latestReviewRuns.map((run) => (
+                    <article key={run.id} className="artifact-item">
+                      <div className="meta-row wrap">
+                        <strong>{run.kind}</strong>
+                        <span className="pill">{run.status}</span>
+                        <span className="pill">{run.id}</span>
+                      </div>
+                      <p>{run.artifact?.reviewSummary || run.summary || 'No review summary yet.'}</p>
+                      {run.artifact?.targetUrl && <p className="muted">Target: {run.artifact.targetUrl}</p>}
+                      {run.artifact?.capturedAt && <p className="muted">Captured: {run.artifact.capturedAt}</p>}
+                      {run.artifact?.snapshotId && <p className="muted">Snapshot: {run.artifact.snapshotId}</p>}
+                      {run.artifact?.screenshotPath && <p className="muted">Screenshot: {run.artifact.screenshotPath}</p>}
+                      {run.artifact?.findings && <p className="muted">Findings: {run.artifact.findings}</p>}
+                      {run.artifact?.evidenceLinks?.length ? (
+                        <ul>
+                          {run.artifact.evidenceLinks.map((link) => (
+                            <li key={link}><a href={link} target="_blank" rel="noreferrer">{link}</a></li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted">No QA/UX review artifacts saved yet.</p>
+              )}
+            </DetailSection>
             <DetailSection title="Result">{selectedTask.status === 'done' ? <p>Completed successfully and surfaced in Done Digest.</p> : selectedTask.status === 'blocked' ? <p>{selectedTask.blockerDetail ?? 'Task is blocked.'}</p> : <p className="muted">Result pending completion.</p>}
               {selectedTask.reviewSummary && <p className="muted">Latest review: {selectedTask.reviewSummary}</p>}
-              {selectedTask.evidenceLinks?.length ? <ul>{selectedTask.evidenceLinks.map((link) => <li key={link}>{link}</li>)}</ul> : null}
+              {selectedTask.evidenceLinks?.length ? <ul>{selectedTask.evidenceLinks.map((link) => <li key={link}><a href={link} target="_blank" rel="noreferrer">{link}</a></li>)}</ul> : null}
             </DetailSection>
           </div>
         </section>

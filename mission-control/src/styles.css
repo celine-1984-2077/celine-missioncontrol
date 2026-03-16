@@ -354,3 +354,27 @@ button.secondary {
   border-radius: 14px;
   padding: 12px;
 }
+
+.artifact-callout,
+.artifact-item {
+  background: rgba(10, 15, 31, 0.56);
+  border: 1px solid rgba(130, 152, 228, 0.12);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.artifact-callout code {
+  display: block;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(6, 10, 20, 0.9);
+  color: #cfe0ff;
+  overflow-x: auto;
+}
+
+.artifact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

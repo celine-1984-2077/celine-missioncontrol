@@ -22,9 +22,11 @@ Current state:
 - browser-test failure can auto-create a linked bug task in triage
 - QA review and UX review skeleton runs can be spawned
 - QA review failure can auto-create follow-up bug tasks
-- review result forms can store summary, findings, screenshot path, snapshot id, and evidence links
+- review result forms can store summary, findings, screenshot path, snapshot id, target URL, and evidence links
+- review artifacts are visible from the task detail panel as a lightweight evidence history
 - review findings can promote improvement/spec-update follow-up tasks
 - initial local browser-review harness is documented under `docs/browser-review-harness.md`
+- roadmap/status is tracked in `docs/roadmap.md`
 - state transitions are validated against the canonical state machine
 - activity entries are generated from task creation, edits, transitions, progress updates, runner actions, and browser-test actions
 
