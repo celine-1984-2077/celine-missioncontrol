@@ -30,6 +30,14 @@ export interface Step {
   status: StepStatus
 }
 
+export interface ReviewArtifact {
+  screenshotPath?: string
+  snapshotId?: string
+  evidenceLinks?: string[]
+  reviewSummary?: string
+  findings?: string
+}
+
 export interface Run {
   id: string
   taskId: string
@@ -40,6 +48,7 @@ export interface Run {
   summary?: string
   errorSummary?: string
   heartbeatAt?: string
+  artifact?: ReviewArtifact
 }
 
 export interface Task {
@@ -73,6 +82,8 @@ export interface Task {
   requiresSpecUpdate?: boolean
   docSyncStatus?: DocSyncStatus
   lastDocSyncAt?: string
+  reviewSummary?: string
+  evidenceLinks?: string[]
 }
 
 export interface ActivityEvent {

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { addProgressEvent, autoPickNextTask, completeReviewRun, completeStep, completeUiTest, createTask, heartbeatRun, loadState, markRunStale, requestReviewRun, requestUiTest, transitionTask, updateTask } from './store'
+import { addProgressEvent, autoPickNextTask, completeReviewRun, completeStep, completeUiTest, createFollowupTask, createTask, heartbeatRun, loadState, markRunStale, requestReviewRun, requestUiTest, transitionTask, updateTask } from './store'
 import type { ActivityEvent, DocSyncStatus, Priority, Task, TaskStatus, TaskType } from './types'
 
 const columns: Array<{ key: TaskStatus; label: string }> = [
@@ -69,6 +69,7 @@ export function App() {
   const [progressText, setProgressText] = useState('')
   const [progressNextStep, setProgressNextStep] = useState('')
   const [error, setError] = useState<string>('')
+  const [reviewDraft, setReviewDraft] = useState({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '' })
 
   const tasks = state.tasks
   const activity = state.activity
@@ -88,6 +89,7 @@ export function App() {
     syncEditDraft(tasks.find((task) => task.id === taskId))
     setProgressText('')
     setProgressNextStep('')
+    setReviewDraft({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '' })
   }
 
   function handleTransition(taskId: string, nextStatus: TaskStatus) {
@@ -149,12 +151,29 @@ export function App() {
     setState(nextState)
     setProgressText('')
     setProgressNextStep('')
+    setReviewDraft({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '' })
   }
 
   function handleCompleteStep(stepId: string) {
     if (!selectedTask) return
     const nextState = completeStep(state, selectedTask.id, stepId)
     setState(nextState)
+  }
+
+
+  function submitReview(runId: string, outcome: 'pass' | 'fail' | 'submit') {
+    const nextState = completeReviewRun(state, runId, outcome, {
+      summary: reviewDraft.summary,
+      findings: reviewDraft.findings,
+      screenshotPath: reviewDraft.screenshotPath,
+      snapshotId: reviewDraft.snapshotId,
+      evidenceLinks: reviewDraft.evidenceLinks
+        .split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean),
+    })
+    setState(nextState)
+    setReviewDraft({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '' })
   }
 
   return (
@@ -215,6 +234,8 @@ export function App() {
                   <p className="muted">Task: {run.taskId}</p>
                   {run.kind === 'ui_test' && <p className="muted">required browser validation</p>}
                   <p className="muted">Heartbeat: {run.heartbeatAt ?? 'n/a'}</p>
+                  {run.artifact?.snapshotId && <p className="muted">Snapshot: {run.artifact.snapshotId}</p>}
+                  {run.artifact?.screenshotPath && <p className="muted">Shot: {run.artifact.screenshotPath}</p>}
                   <div className="transition-row">
                     {run.status === 'running' && <button type="button" className="secondary small-button" onClick={() => setState(heartbeatRun(state, run.id))}>Heartbeat</button>}
                     {run.status === 'running' && run.kind === 'execution' && <button type="button" className="secondary small-button" onClick={() => setState(markRunStale(state, run.id))}>Mark stale</button>}
@@ -301,7 +322,31 @@ export function App() {
             <DetailSection title="Plan"><ol>{selectedTask.plan.map((step) => <li key={step.id} className="step-row"><div><span className={`step-state ${step.status}`}>{step.status}</span>{step.label}</div>{step.status !== 'done' && <button type="button" className="secondary small-button" onClick={() => handleCompleteStep(step.id)}>Complete</button>}</li>)}</ol></DetailSection>
             <DetailSection title="Acceptance Criteria"><ul>{selectedTask.acceptanceCriteria.map((item) => <li key={item}>{item}</li>)}</ul></DetailSection>
             <DetailSection title="Progress Log"><ul>{activity.filter((event) => event.taskId === selectedTask.id).map((event) => <li key={event.id}><strong>{event.title}</strong>{event.body ? ` — ${event.body}` : ''}</li>)}</ul></DetailSection>
-            <DetailSection title="Result">{selectedTask.status === 'done' ? <p>Completed successfully and surfaced in Done Digest.</p> : selectedTask.status === 'blocked' ? <p>{selectedTask.blockerDetail ?? 'Task is blocked.'}</p> : <p className="muted">Result pending completion.</p>}</DetailSection>
+            <DetailSection title="Review Result Form">
+              <form className="detail-form">
+                <label><span>Review summary</span><textarea rows={3} value={reviewDraft.summary} onChange={(e) => setReviewDraft({ ...reviewDraft, summary: e.target.value })} /></label>
+                <label><span>Findings</span><textarea rows={4} value={reviewDraft.findings} onChange={(e) => setReviewDraft({ ...reviewDraft, findings: e.target.value })} /></label>
+                <label><span>Screenshot path</span><input value={reviewDraft.screenshotPath} onChange={(e) => setReviewDraft({ ...reviewDraft, screenshotPath: e.target.value })} placeholder="/tmp/...png" /></label>
+                <label><span>Snapshot ID</span><input value={reviewDraft.snapshotId} onChange={(e) => setReviewDraft({ ...reviewDraft, snapshotId: e.target.value })} /></label>
+                <label><span>Evidence links (one per line)</span><textarea rows={3} value={reviewDraft.evidenceLinks} onChange={(e) => setReviewDraft({ ...reviewDraft, evidenceLinks: e.target.value })} /></label>
+                <div className="actions-row wrap">
+                  {runs.filter((run) => run.taskId === selectedTask.id && run.status === 'running' && (run.kind === 'qa_review' || run.kind === 'ux_review')).map((run) => (
+                    <div key={run.id} className="transition-row">
+                      <span className="pill">{run.kind} · {run.id}</span>
+                      {run.kind === 'qa_review' && <button type="button" onClick={() => submitReview(run.id, 'pass')}>Submit QA pass</button>}
+                      {run.kind === 'qa_review' && <button type="button" className="secondary" onClick={() => submitReview(run.id, 'fail')}>Submit QA fail</button>}
+                      {run.kind === 'ux_review' && <button type="button" onClick={() => submitReview(run.id, 'submit')}>Submit UX review</button>}
+                    </div>
+                  ))}
+                  <button type="button" className="secondary" onClick={() => setState(createFollowupTask(state, selectedTask.id, 'improvement', `Improve: ${selectedTask.title}`, reviewDraft.summary || 'UX improvement requested from review.'))}>Create improvement task</button>
+                  <button type="button" className="secondary" onClick={() => setState(createFollowupTask(state, selectedTask.id, 'spec_update', `Spec update: ${selectedTask.title}`, reviewDraft.summary || 'Spec update requested from review.'))}>Create spec-update task</button>
+                </div>
+              </form>
+            </DetailSection>
+            <DetailSection title="Result">{selectedTask.status === 'done' ? <p>Completed successfully and surfaced in Done Digest.</p> : selectedTask.status === 'blocked' ? <p>{selectedTask.blockerDetail ?? 'Task is blocked.'}</p> : <p className="muted">Result pending completion.</p>}
+              {selectedTask.reviewSummary && <p className="muted">Latest review: {selectedTask.reviewSummary}</p>}
+              {selectedTask.evidenceLinks?.length ? <ul>{selectedTask.evidenceLinks.map((link) => <li key={link}>{link}</li>)}</ul> : null}
+            </DetailSection>
           </div>
         </section>
       )}

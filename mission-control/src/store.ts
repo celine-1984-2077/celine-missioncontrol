@@ -41,6 +41,14 @@ export interface TaskUpdateInput {
   requiresSpecUpdate?: boolean
 }
 
+export interface ReviewSubmissionInput {
+  summary: string
+  findings?: string
+  screenshotPath?: string
+  snapshotId?: string
+  evidenceLinks?: string[]
+}
+
 export function loadState(): MissionControlState {
   if (typeof window === 'undefined') {
     return { tasks: seedTasks, activity: seedActivity, runs: seedRuns }
@@ -576,6 +584,7 @@ export function completeReviewRun(
   state: MissionControlState,
   runId: string,
   outcome: 'pass' | 'fail' | 'submit',
+  submission?: ReviewSubmissionInput,
 ): MissionControlState {
   const run = state.runs.find((item) => item.id === runId)
   if (!run || (run.kind !== 'qa_review' && run.kind !== 'ux_review')) return state
@@ -587,11 +596,21 @@ export function completeReviewRun(
     status: outcome === 'fail' ? 'failed' : 'passed',
     endedAt: now,
     summary:
-      run.kind === 'qa_review'
+      submission?.summary ||
+      (run.kind === 'qa_review'
         ? outcome === 'pass'
           ? 'QA review passed.'
           : 'QA review failed.'
-        : 'UX review submitted.',
+        : 'UX review submitted.'),
+    artifact: submission
+      ? {
+          screenshotPath: submission.screenshotPath,
+          snapshotId: submission.snapshotId,
+          evidenceLinks: submission.evidenceLinks,
+          reviewSummary: submission.summary,
+          findings: submission.findings,
+        }
+      : run.artifact,
   }
 
   let extraTasks: Task[] = []
@@ -627,6 +646,8 @@ export function completeReviewRun(
       requiresSpecUpdate: false,
       docSyncStatus: 'in_sync',
       lastDocSyncAt: now,
+      reviewSummary: submission?.summary,
+      evidenceLinks: submission?.evidenceLinks,
     })
     extraEvents.push({
       id: crypto.randomUUID(),
@@ -648,7 +669,7 @@ export function completeReviewRun(
       runId: run.id,
       type: 'ux_review_submitted',
       title: `${task.id} UX review submitted`,
-      body: 'Use this review output to create polish or improvement tasks.',
+      body: submission?.summary || 'Use this review output to create polish or improvement tasks.',
       createdAt: now,
       createdBy: 'system',
     })
@@ -662,7 +683,7 @@ export function completeReviewRun(
       runId: run.id,
       type: outcome === 'pass' ? 'qa_review_passed' : 'qa_review_failed',
       title: outcome === 'pass' ? `${task.id} QA review passed` : `${task.id} QA review failed`,
-      body: outcome === 'pass' ? 'Separate QA validation passed.' : 'Separate QA validation failed and requires follow-up.',
+      body: submission?.summary || (outcome === 'pass' ? 'Separate QA validation passed.' : 'Separate QA validation failed and requires follow-up.'),
       createdAt: now,
       createdBy: 'system',
     })
@@ -673,6 +694,59 @@ export function completeReviewRun(
     runs: state.runs.map((item) => (item.id === runId ? updatedRun : item)),
     activity: [...extraEvents.reverse(), ...state.activity],
   })
+}
+
+
+export function createFollowupTask(
+  state: MissionControlState,
+  taskId: string,
+  kind: 'improvement' | 'spec_update',
+  title: string,
+  summary: string,
+): MissionControlState {
+  const task = state.tasks.find((item) => item.id === taskId)
+  if (!task) return state
+  const now = new Date().toISOString()
+  const nextId = `MC-${state.tasks.length + 1}`
+  const newTask: Task = {
+    id: nextId,
+    title,
+    objective: summary,
+    acceptanceCriteria: ['Follow-up captured and tracked', 'Task reviewed and processed'],
+    boundaries: ['Derived from review workflow'],
+    status: 'triage',
+    projectId: task.projectId,
+    type: kind,
+    requiresApproval: false,
+    priority: kind === 'spec_update' ? 'medium' : 'high',
+    createdBy: 'system',
+    source: 'system',
+    assignee: 'celine',
+    needsUiTest: false,
+    parentTaskId: task.id,
+    plan: [
+      { id: `${nextId}-1`, label: 'Review finding', status: 'pending' },
+      { id: `${nextId}-2`, label: 'Apply change', status: 'pending' },
+    ],
+    lastEventAt: now,
+    createdAt: now,
+    updatedAt: now,
+    specVersionSeen: task.specVersionSeen,
+    requiresSpecUpdate: kind === 'spec_update',
+    docSyncStatus: kind === 'spec_update' ? 'needs_update' : 'in_sync',
+    lastDocSyncAt: now,
+  }
+  const event: ActivityEvent = {
+    id: crypto.randomUUID(),
+    taskId: nextId,
+    projectId: task.projectId,
+    type: kind === 'spec_update' ? 'spec_update_requested' : 'bug_created',
+    title: `${nextId} created from review findings`,
+    body: summary,
+    createdAt: now,
+    createdBy: 'system',
+  }
+  return commit({ ...state, tasks: [newTask, ...state.tasks], activity: [event, ...state.activity] })
 }
 
 function finalizeRun(runs: Run[], runId: string, status: 'passed' | 'failed', now: string) {

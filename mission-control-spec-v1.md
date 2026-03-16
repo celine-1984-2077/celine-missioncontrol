@@ -226,6 +226,15 @@ Run {
   summary?: string
   errorSummary?: string
   artifactIds?: string[]
+  artifact?: ReviewArtifact
+}
+
+ReviewArtifact {
+  screenshotPath?: string
+  snapshotId?: string
+  evidenceLinks?: string[]
+  reviewSummary?: string
+  findings?: string
 }
 ```
 
@@ -395,6 +404,15 @@ Key rule:
 - **implemented != validated**
 
 A task may be implemented, but until QA/browser validation passes, it is not validated.
+
+### 8.5.1.1 Review artifact expectation
+
+Review-oriented runs should support structured evidence capture, including:
+- screenshot path
+- snapshot id
+- review summary
+- findings
+- evidence links
 
 ### 8.5.2 QA session responsibilities
 
@@ -705,6 +723,8 @@ These should appear in the docs surface and become editable, linked project know
 - [ ] promote UX findings to improvement / spec-update tasks
 - [ ] browser-backed QA review session wiring
 - [ ] browser-backed UX review session wiring
+- [x] review artifact data model and form prototype
+- [x] promote review findings to improvement/spec-update follow-up tasks
 
 ### Phase F — Notifications
 - [ ] Discord event delivery
