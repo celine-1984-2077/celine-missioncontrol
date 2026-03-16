@@ -47,6 +47,13 @@ Other planned website areas:
   - Structured task details (Objective / Plan / Progress Log / Result)
   - Done digest / concise completion summaries
 
+## Confirmed Mission Control Decisions
+
+- Canonical task states are: Backlog, Triage, In Progress, Blocked, Done.
+- Triage should default to auto-start.
+- Sensitive/ambiguous tasks can opt into approval via `requiresApproval`.
+- Review and Testing should not be long-lived primary board columns; they are better modeled as phases/events/flags.
+
 ## Operating Preferences
 
 - When Tony says to remember something, I should write it down explicitly in memory/files.
