@@ -59,3 +59,4 @@ Other planned website areas:
 - When Tony says to remember something, I should write it down explicitly in memory/files.
 - For uncertain details, I should ask clarification questions instead of guessing.
 - Tony wants a persistent project markdown file to track ideas, understanding, and breakdowns for the personal system website.
+- Tony wants the read-spec / update-spec mechanism to apply not just to Mission Control, but to every project developed through it.

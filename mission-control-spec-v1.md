@@ -452,16 +452,50 @@ Sections:
 
 ---
 
-## 12. Reliability Rules
+## 12. Documentation Sync Rules
+
+Mission Control must follow the workspace-wide project protocol in `PROJECT_PROTOCOL.md`.
+
+### 12.1 Required pre-work read
+
+Before meaningful Mission Control work, read:
+- `PROJECT_PROTOCOL.md`
+- `mission-control/AGENTS.md`
+- this spec
+- any relevant decision notes if they exist
+
+### 12.2 Required post-work sync
+
+If implementation changes behavior, workflow, schema, contracts, or operator expectations, the docs must be updated in the same work session.
+
+### 12.3 Task schema reservation for doc sync
+
+Mission Control should reserve support for fields like:
+
+```ts
+specVersionSeen?: string
+requiresSpecUpdate?: boolean
+docSyncStatus?: 'in_sync' | 'needs_update' | 'deferred'
+lastDocSyncAt?: string
+```
+
+### 12.4 Project propagation rule
+
+Because Mission Control will manage future projects, it should eventually help bootstrap the same mechanism for every project it creates or manages:
+- project-level `AGENTS.md`
+- project spec file
+- visible doc-sync status
+
+## 13. Reliability Rules
 
 These are non-negotiable for v1.
 
-### 12.1 Single source of truth
+### 13.1 Single source of truth
 
 Task status must come from one authoritative store.
 Do not let UI, runner, and notifications each invent their own task state.
 
-### 12.2 Atomic pickup
+### 13.2 Atomic pickup
 
 Picking a triage task must atomically:
 - verify task is still pickable
@@ -470,11 +504,11 @@ Picking a triage task must atomically:
 - transition to `in_progress`
 - emit pickup event
 
-### 12.3 Idempotent notifications
+### 13.3 Idempotent notifications
 
 If notification delivery retries, duplicate sends should be prevented or tolerated safely.
 
-### 12.4 Structured failure handling
+### 13.4 Structured failure handling
 
 Runner/test failure must always produce:
 - an event
@@ -483,13 +517,13 @@ Runner/test failure must always produce:
 
 No silent failure.
 
-### 12.5 No orphaned runs
+### 13.5 No orphaned runs
 
 If a run crashes or disappears, Mission Control should eventually detect stale runs and surface them as blocked or errored.
 
 ---
 
-## 13. MVP Success Criteria
+## 14. MVP Success Criteria
 
 Mission Control v1 is successful when all of the following are true:
 
@@ -506,7 +540,7 @@ Mission Control v1 is successful when all of the following are true:
 
 ---
 
-## 14. Build Order Recommendation
+## 15. Build Order Recommendation
 
 ### Phase A — Spec + repo bootstrap
 - create standalone repo
@@ -541,7 +575,7 @@ Mission Control v1 is successful when all of the following are true:
 
 ---
 
-## 15. Open Questions for v1.1+
+## 16. Open Questions for v1.1+
 
 - Should blocked tasks support SLA / reminder timers?
 - Should there be a separate concept of `epic` or `initiative` above tasks?
