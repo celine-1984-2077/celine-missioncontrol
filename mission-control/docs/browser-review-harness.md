@@ -98,3 +98,25 @@ node mission-control/scripts/ingest-browser-review.mjs /tmp/mission-control-brow
 ```
 
 Then paste the emitted values into the Review Result Form, or import the original harness JSON directly in the UI.
+
+
+## Automated review packet generation
+
+Generate a browser-review packet for a QA or UX review run:
+
+```bash
+node mission-control/scripts/run-review-cycle.mjs \
+  --kind qa_review \
+  --taskId MC-1 \
+  --title "Build Mission Control app skeleton" \
+  --objective "Validate current Mission Control UI state" \
+  --targetUrl http://127.0.0.1:4173/
+```
+
+This currently automates:
+- browser capture
+- JSON ingest
+- review packet generation
+- markdown evidence note generation
+
+It does not yet auto-write back into browser localStorage-backed Mission Control state.
