@@ -14,8 +14,10 @@ Advance Mission Control from a local board prototype into an autonomous review/d
 - QA review and UX review run modeling
 - review artifact fields for summary, findings, screenshot path, snapshot id, evidence links, and target URL
 - task detail surface for review artifact history
+- missing-evidence warnings on review artifacts plus dashboard counts for incomplete reviews
 - notification digest helpers + UI preview for push-friendly summaries
 - copy-ready board/task digest actions for push-message handoff
+- digest output now includes missing-evidence counts and example incomplete review runs
 - browser review harness script that saves reusable JSON artifacts
 
 ## Next priorities
@@ -35,6 +37,7 @@ Advance Mission Control from a local board prototype into an autonomous review/d
 - track artifact timestamps and latest evidence per task
 - add lightweight import/export for review artifacts
 - support screenshot + snapshot bundles in a stable review folder
+- escalate incomplete review submissions (missing screenshot/snapshot/links) sooner than task-detail-only visibility
 
 ### 4. Notification-ready outputs
 - generate compact summaries suitable for Discord push notifications
@@ -52,3 +55,4 @@ Advance Mission Control from a local board prototype into an autonomous review/d
 - app runtime still does not directly invoke `peekaboo`; the browser harness is still shell-driven
 - Discord push wiring is still modeled, not fully executed from app state transitions
 - no backend persistence yet; current state remains browser-local
+- exported state still requires a manual browser download; `/tmp/mission-control/state.json` is not refreshed automatically yet
