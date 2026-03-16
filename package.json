@@ -1,0 +1,7 @@
+{
+  "name": "celine-workspace",
+  "private": true,
+  "workspaces": [
+    "mission-control"
+  ]
+}

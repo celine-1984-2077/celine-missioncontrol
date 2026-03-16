@@ -1,2 +1,5 @@
 .openclaw/
 TuanInsurance/
+node_modules/
+mission-control/dist/
+mission-control/*.tsbuildinfo
