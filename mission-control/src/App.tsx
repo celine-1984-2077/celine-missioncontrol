@@ -330,20 +330,6 @@ export function App() {
                     ))}
                   </div>
                 </section>
-                {selectedTask.status === 'in_progress' && (
-                  <div className="actions-row wrap">
-                    <button onClick={() => addQuickLog('Progress check from detail modal.')}>Add log</button>
-                    <button className="secondary" onClick={() => setState(completeStep(state, selectedTask.plan.find((s) => s.status !== 'done')?.id || selectedTask.plan[0].id ? selectedTask.id : selectedTask.id, selectedTask.plan.find((s) => s.status !== 'done')?.id || selectedTask.plan[0].id))}>Complete next step</button>
-                    {transitionTargets[selectedTask.status].map((nextStatus) => <button key={nextStatus} className="secondary" onClick={() => handleTransition(selectedTask.id, nextStatus)}>Move to {nextStatus}</button>)}
-                  </div>
-                )}
-                {selectedTask.needsUiTest && (
-                  <div className="actions-row wrap">
-                    <button onClick={() => setState(requestUiTest(state, selectedTask.id))}>Start browser test</button>
-                    <button className="secondary" onClick={() => setState(completeUiTest(state, selectedTask.id, true))}>Mark browser test passed</button>
-                    <button className="secondary" onClick={() => setState(completeUiTest(state, selectedTask.id, false))}>Mark browser test failed</button>
-                  </div>
-                )}
               </div>
             )}
           </div>
