@@ -1,5 +1,5 @@
 import { tasks as seedTasks, activity as seedActivity } from './sampleData'
-import type { ActivityEvent, Task, TaskStatus } from './types'
+import type { ActivityEvent, DocSyncStatus, Task, TaskStatus } from './types'
 
 const TASKS_KEY = 'mission-control/tasks'
 const EVENTS_KEY = 'mission-control/events'
@@ -15,6 +15,28 @@ const allowedTransitions: Record<TaskStatus, TaskStatus[]> = {
 export interface MissionControlState {
   tasks: Task[]
   activity: ActivityEvent[]
+}
+
+export interface TaskDraft {
+  title: string
+  objective: string
+  acceptanceCriteria: string[]
+  boundaries?: string[]
+  type: Task['type']
+  priority: Task['priority']
+  status: 'backlog' | 'triage' | 'blocked'
+  requiresApproval: boolean
+  needsUiTest: boolean
+}
+
+export interface TaskUpdateInput {
+  title: string
+  objective: string
+  acceptanceCriteria: string[]
+  boundaries?: string[]
+  nextStep?: string
+  docSyncStatus?: DocSyncStatus
+  requiresSpecUpdate?: boolean
 }
 
 export function loadState(): MissionControlState {
@@ -42,11 +64,7 @@ export function saveState(state: MissionControlState) {
   window.localStorage.setItem(EVENTS_KEY, JSON.stringify(state.activity))
 }
 
-export function transitionTask(
-  state: MissionControlState,
-  taskId: string,
-  nextStatus: TaskStatus,
-): MissionControlState {
+export function transitionTask(state: MissionControlState, taskId: string, nextStatus: TaskStatus): MissionControlState {
   const task = state.tasks.find((item) => item.id === taskId)
   if (!task) return state
 
@@ -62,24 +80,17 @@ export function transitionTask(
     updatedAt: now,
     lastEventAt: now,
     completedAt: nextStatus === 'done' ? now : task.completedAt,
-    currentStepIndex:
-      nextStatus === 'in_progress' && typeof task.currentStepIndex !== 'number' ? 0 : task.currentStepIndex,
+    currentStepIndex: nextStatus === 'in_progress' && typeof task.currentStepIndex !== 'number' ? 0 : task.currentStepIndex,
   }
 
   const event = buildTransitionEvent(task, nextStatus, now)
-
-  const nextState = {
+  return commit(state, {
     tasks: state.tasks.map((item) => (item.id === taskId ? updatedTask : item)),
     activity: [event, ...state.activity],
-  }
-  saveState(nextState)
-  return nextState
+  })
 }
 
-export function createTask(
-  state: MissionControlState,
-  draft: Pick<Task, 'title' | 'objective' | 'acceptanceCriteria' | 'boundaries' | 'type' | 'priority' | 'status' | 'requiresApproval' | 'needsUiTest'>,
-): MissionControlState {
+export function createTask(state: MissionControlState, draft: TaskDraft): MissionControlState {
   const now = new Date().toISOString()
   const nextId = `MC-${state.tasks.length + 1}`
   const newTask: Task = {
@@ -122,12 +133,116 @@ export function createTask(
     createdBy: 'tony',
   }
 
-  const nextState = {
+  return commit(state, {
     tasks: [newTask, ...state.tasks],
     activity: [event, ...state.activity],
+  })
+}
+
+export function updateTask(state: MissionControlState, taskId: string, input: TaskUpdateInput): MissionControlState {
+  const task = state.tasks.find((item) => item.id === taskId)
+  if (!task) return state
+  const now = new Date().toISOString()
+
+  const updatedTask: Task = {
+    ...task,
+    title: input.title,
+    objective: input.objective,
+    acceptanceCriteria: input.acceptanceCriteria,
+    boundaries: input.boundaries,
+    nextStep: input.nextStep,
+    docSyncStatus: input.docSyncStatus ?? task.docSyncStatus,
+    requiresSpecUpdate: input.requiresSpecUpdate ?? task.requiresSpecUpdate,
+    updatedAt: now,
+    lastEventAt: now,
+    lastDocSyncAt: input.docSyncStatus ? now : task.lastDocSyncAt,
   }
-  saveState(nextState)
-  return nextState
+
+  const event: ActivityEvent = {
+    id: crypto.randomUUID(),
+    taskId: task.id,
+    projectId: task.projectId,
+    type: 'plan_updated',
+    title: `${task.id} details updated`,
+    body: 'Objective, acceptance criteria, boundaries, or doc-sync fields changed.',
+    createdAt: now,
+    createdBy: 'celine',
+  }
+
+  return commit(state, {
+    tasks: state.tasks.map((item) => (item.id === taskId ? updatedTask : item)),
+    activity: [event, ...state.activity],
+  })
+}
+
+export function addProgressEvent(state: MissionControlState, taskId: string, message: string, nextStep?: string): MissionControlState {
+  const task = state.tasks.find((item) => item.id === taskId)
+  if (!task) return state
+  const now = new Date().toISOString()
+
+  const updatedTask: Task = {
+    ...task,
+    nextStep: nextStep ?? task.nextStep,
+    updatedAt: now,
+    lastEventAt: now,
+  }
+
+  const event: ActivityEvent = {
+    id: crypto.randomUUID(),
+    taskId: task.id,
+    projectId: task.projectId,
+    type: 'progress',
+    title: `${task.id} progress update`,
+    body: message,
+    createdAt: now,
+    createdBy: 'celine',
+  }
+
+  return commit(state, {
+    tasks: state.tasks.map((item) => (item.id === taskId ? updatedTask : item)),
+    activity: [event, ...state.activity],
+  })
+}
+
+export function completeStep(state: MissionControlState, taskId: string, stepId: string): MissionControlState {
+  const task = state.tasks.find((item) => item.id === taskId)
+  if (!task) return state
+  const now = new Date().toISOString()
+
+  const stepIndex = task.plan.findIndex((step) => step.id === stepId)
+  if (stepIndex === -1) return state
+
+  const nextPlan = task.plan.map((step, index) => {
+    if (index < stepIndex) return { ...step, status: 'done' as const }
+    if (index === stepIndex) return { ...step, status: 'done' as const }
+    if (index === stepIndex + 1) return { ...step, status: 'in_progress' as const }
+    return step
+  })
+
+  const updatedTask: Task = {
+    ...task,
+    plan: nextPlan,
+    currentStepIndex: Math.min(stepIndex + 1, nextPlan.length - 1),
+    nextStep: nextPlan[stepIndex + 1]?.label,
+    updatedAt: now,
+    lastEventAt: now,
+  }
+
+  const event: ActivityEvent = {
+    id: crypto.randomUUID(),
+    taskId: task.id,
+    projectId: task.projectId,
+    type: 'step_completed',
+    title: `${task.id} step completed`,
+    body: task.plan[stepIndex]?.label,
+    createdAt: now,
+    createdBy: 'celine',
+  }
+
+  return commit(state, {
+    tasks: state.tasks.map((item) => (item.id === taskId ? updatedTask : item)),
+    activity: [event, ...state.activity],
+  })
 }
 
 function buildTransitionEvent(task: Task, nextStatus: TaskStatus, createdAt: string): ActivityEvent {
@@ -148,4 +263,9 @@ function buildTransitionEvent(task: Task, nextStatus: TaskStatus, createdAt: str
     createdAt,
     createdBy: 'celine',
   }
+}
+
+function commit(_state: MissionControlState, nextState: MissionControlState): MissionControlState {
+  saveState(nextState)
+  return nextState
 }

@@ -294,3 +294,44 @@ button.secondary {
 }
 
 .wrap { flex-wrap: wrap; }
+
+
+.detail-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.detail-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-form input,
+.detail-form select,
+.detail-form textarea {
+  width: 100%;
+  background: rgba(10, 15, 31, 0.72);
+  color: #ecf1ff;
+  border: 1px solid rgba(130, 152, 228, 0.18);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.compact {
+  margin-top: 0;
+}
+
+.step-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.small-button {
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}

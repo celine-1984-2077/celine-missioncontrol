@@ -8,6 +8,7 @@ export type ActivityEventType =
   | 'task_picked_up'
   | 'task_started'
   | 'progress'
+  | 'plan_updated'
   | 'step_completed'
   | 'blocked'
   | 'ui_test_failed'

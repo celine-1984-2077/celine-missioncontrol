@@ -552,8 +552,11 @@ Mission Control v1 is successful when all of the following are true:
 - browser-local task store (localStorage for MVP)
 - board UI
 - validated state transitions
-- activity feed derived from task creation and transitions
+- activity feed derived from task creation, edits, transitions, and progress updates
 - minimum task creation form
+- task detail editing
+- structured progress logging
+- plan step completion UI
 
 ### Phase C — Runner backbone
 - triage polling

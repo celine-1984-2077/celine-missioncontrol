@@ -11,8 +11,11 @@ Current state:
 - board UI, activity feed, task detail panel, and doc-sync fields are visible
 - local task store persists to browser localStorage
 - task creation form is wired
+- task detail editing is wired
+- structured progress updates can be added per task
+- steps can be completed from the plan UI
 - state transitions are validated against the canonical state machine
-- activity entries are generated from task creation and transitions
+- activity entries are generated from task creation, edits, transitions, and progress updates
 
 Planned focus:
 - Kanban task board
