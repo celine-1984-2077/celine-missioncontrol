@@ -60,6 +60,8 @@ export interface ReviewEvidenceSummary {
   latestRun?: Run
   latestCompletedRun?: Run
   latestArtifact?: Run['artifact']
+  latestEvidenceAt?: string
+  latestEvidenceLabel?: string
   missingEvidence: boolean
 }
 
@@ -803,6 +805,8 @@ export function getReviewEvidenceSummary(
   const latestRun = reviewRuns[0]
   const latestCompletedRun = reviewRuns.find((run) => run.status !== 'running')
   const latestArtifact = latestCompletedRun?.artifact
+  const latestEvidenceAt = latestArtifact?.capturedAt ?? latestCompletedRun?.endedAt ?? latestCompletedRun?.startedAt
+  const latestEvidenceLabel = latestArtifact?.snapshotId ?? latestArtifact?.screenshotPath ?? latestArtifact?.evidenceLinks?.[0]
   const missingEvidence = Boolean(
     latestCompletedRun &&
     !latestArtifact?.screenshotPath &&
@@ -814,6 +818,8 @@ export function getReviewEvidenceSummary(
     latestRun,
     latestCompletedRun,
     latestArtifact,
+    latestEvidenceAt,
+    latestEvidenceLabel,
     missingEvidence,
   }
 }
@@ -837,14 +843,16 @@ export function getTaskNotificationDigest(state: MissionControlState, taskId: st
   const qaEvidence = getReviewEvidenceSummary(state, task.id, 'qa_review')
   const uxEvidence = getReviewEvidenceSummary(state, task.id, 'ux_review')
   lines.push(`gates: ui=${uiReady ? 'ok' : 'pending'} qa=${qaReady ? 'ok' : 'pending'} ux=${uxReady ? 'ok' : 'pending'}`)
-  if (qaEvidence.latestArtifact?.screenshotPath || qaEvidence.latestArtifact?.snapshotId) {
-    lines.push(`qa evidence: ${qaEvidence.latestArtifact?.snapshotId ?? qaEvidence.latestArtifact?.screenshotPath}`)
+  if (qaEvidence.latestEvidenceLabel) {
+    lines.push(`qa evidence: ${qaEvidence.latestEvidenceLabel}`)
+    if (qaEvidence.latestEvidenceAt) lines.push(`qa evidence captured_at: ${qaEvidence.latestEvidenceAt}`)
   } else if (qaEvidence.missingEvidence) {
     lines.push('qa evidence: missing capture/link proof')
   }
   if (task.requiresUxReview) {
-    if (uxEvidence.latestArtifact?.screenshotPath || uxEvidence.latestArtifact?.snapshotId) {
-      lines.push(`ux evidence: ${uxEvidence.latestArtifact?.snapshotId ?? uxEvidence.latestArtifact?.screenshotPath}`)
+    if (uxEvidence.latestEvidenceLabel) {
+      lines.push(`ux evidence: ${uxEvidence.latestEvidenceLabel}`)
+      if (uxEvidence.latestEvidenceAt) lines.push(`ux evidence captured_at: ${uxEvidence.latestEvidenceAt}`)
     } else if (uxEvidence.missingEvidence) {
       lines.push('ux evidence: missing capture/link proof')
     }
@@ -877,7 +885,7 @@ export function getBoardNotificationDigest(state: MissionControlState): Notifica
   const latestEvents = state.activity.slice(0, 3).map((event) => `${event.taskId}: ${event.title}`)
   const evidenceReadyTasks = state.tasks
     .map((task) => ({ task, review: getReviewEvidenceSummary(state, task.id) }))
-    .filter(({ review }) => review.latestArtifact?.snapshotId || review.latestArtifact?.screenshotPath)
+    .filter(({ review }) => review.latestEvidenceLabel)
 
   const nextAction = blocked[0]?.blockerDetail
     ? `Resolve blocker on ${blocked[0].id}`
@@ -896,7 +904,10 @@ export function getBoardNotificationDigest(state: MissionControlState): Notifica
       ...(blocked.slice(0, 2).map((task) => `blocked: ${task.id} ${task.blockerDetail ?? task.title}`)),
       ...(pendingUx.slice(0, 2).map((task) => `ux gate: ${task.id} awaiting UX review pass`)),
       ...(missingEvidence.slice(0, 2).map((run) => `missing evidence: ${run.taskId} ${run.kind} ${run.id}`)),
-      ...(evidenceReadyTasks.slice(0, 2).map(({ task, review }) => `latest evidence: ${task.id} ${review.latestArtifact?.snapshotId ?? review.latestArtifact?.screenshotPath}`)),
+      ...(evidenceReadyTasks.slice(0, 2).flatMap(({ task, review }) => [
+        `latest evidence: ${task.id} ${review.latestEvidenceLabel}`,
+        ...(review.latestEvidenceAt ? [`latest evidence captured_at: ${task.id} ${review.latestEvidenceAt}`] : []),
+      ])),
       ...(inProgress.slice(0, 2).map((task) => `active: ${task.id} next=${task.nextStep ?? 'unset'}`)),
       ...latestEvents,
     ],

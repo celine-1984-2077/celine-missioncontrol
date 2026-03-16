@@ -82,6 +82,8 @@ function getReviewEvidenceSummary(state, taskId, kind) {
 
   const latestCompletedRun = reviewRuns.find((run) => run.status !== 'running')
   const latestArtifact = latestCompletedRun?.artifact
+  const latestEvidenceAt = latestArtifact?.capturedAt || latestCompletedRun?.endedAt || latestCompletedRun?.startedAt
+  const latestEvidenceLabel = latestArtifact?.snapshotId || latestArtifact?.screenshotPath || latestArtifact?.evidenceLinks?.[0]
   const missingEvidence = Boolean(
     latestCompletedRun &&
     !latestArtifact?.screenshotPath &&
@@ -89,7 +91,7 @@ function getReviewEvidenceSummary(state, taskId, kind) {
     !(latestArtifact?.evidenceLinks?.length)
   )
 
-  return { latestCompletedRun, latestArtifact, missingEvidence }
+  return { latestCompletedRun, latestArtifact, latestEvidenceAt, latestEvidenceLabel, missingEvidence }
 }
 
 function getBoardNotificationDigest(state) {
@@ -105,7 +107,7 @@ function getBoardNotificationDigest(state) {
   )
   const evidenceReadyTasks = state.tasks
     .map((task) => ({ task, review: getReviewEvidenceSummary(state, task.id) }))
-    .filter(({ review }) => review.latestArtifact?.snapshotId || review.latestArtifact?.screenshotPath)
+    .filter(({ review }) => review.latestEvidenceLabel)
   const latestEvents = state.activity.slice(0, 3).map((event) => `${event.taskId}: ${event.title}`)
 
   const nextAction = blocked[0]?.blockerDetail
@@ -126,7 +128,10 @@ function getBoardNotificationDigest(state) {
       ...blocked.slice(0, 2).map((task) => `blocked: ${task.id} ${task.blockerDetail || task.title}`),
       ...pendingUx.slice(0, 2).map((task) => `ux gate: ${task.id} awaiting UX review pass`),
       ...missingEvidence.slice(0, 2).map((run) => `missing evidence: ${run.taskId} ${run.kind} ${run.id}`),
-      ...evidenceReadyTasks.slice(0, 2).map(({ task, review }) => `latest evidence: ${task.id} ${review.latestArtifact.snapshotId || review.latestArtifact.screenshotPath}`),
+      ...evidenceReadyTasks.slice(0, 2).flatMap(({ task, review }) => [
+        `latest evidence: ${task.id} ${review.latestEvidenceLabel}`,
+        ...(review.latestEvidenceAt ? [`latest evidence captured_at: ${task.id} ${review.latestEvidenceAt}`] : []),
+      ]),
       ...inProgress.slice(0, 2).map((task) => `active: ${task.id} next=${task.nextStep || 'unset'}`),
       ...latestEvents,
     ],

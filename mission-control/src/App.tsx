@@ -443,8 +443,11 @@ export function App() {
                     <span>Import harness JSON (optional)</span>
                     <input type="file" accept="application/json" onChange={importReviewArtifactFromFile} />
                   </label>
-                  {selectedTaskEvidence?.latestArtifact && (
-                    <p className="muted">Latest saved evidence: {selectedTaskEvidence.latestArtifact.snapshotId ?? selectedTaskEvidence.latestArtifact.screenshotPath ?? 'artifact attached'}</p>
+                  {selectedTaskEvidence?.latestEvidenceLabel && (
+                    <p className="muted">Latest saved evidence: {selectedTaskEvidence.latestEvidenceLabel}</p>
+                  )}
+                  {selectedTaskEvidence?.latestEvidenceAt && (
+                    <p className="muted">Latest evidence captured at: {selectedTaskEvidence.latestEvidenceAt}</p>
                   )}
                   {selectedTaskEvidence?.missingEvidence && (
                     <p className="missing-evidence">Latest completed review still has no screenshot, snapshot, or evidence link attached.</p>

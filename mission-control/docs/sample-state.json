@@ -48,6 +48,7 @@
       "summary": "UX review submitted with notes but no captured evidence yet.",
       "artifact": {
         "reviewSummary": "Navigation labels still feel rough; refine after next pass.",
+        "snapshotId": "SAMPLE-UX-REVIEW-1",
         "capturedAt": "2026-03-16T07:05:00.000Z"
       }
     }

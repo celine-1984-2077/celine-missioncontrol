@@ -39,6 +39,7 @@ Advance Mission Control from a local board prototype into an autonomous review/d
 - track artifact timestamps and latest evidence per task
 - add lightweight import/export for review artifacts
 - support screenshot + snapshot bundles in a stable review folder
+- expose evidence timestamps in notification digests so overnight pushes show evidence freshness, not just existence
 - escalate incomplete review submissions (missing screenshot/snapshot/links) sooner than task-detail-only visibility
 
 ### 4. Notification-ready outputs

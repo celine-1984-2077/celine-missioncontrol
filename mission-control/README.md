@@ -74,7 +74,7 @@ Review artifact cards now flag missing evidence when a QA/UX run has no screensh
 The dashboard now counts completed review runs that are still missing evidence.
 Review forms can now import the browser harness JSON artifact directly to prefill snapshot/screenshot evidence.
 Board cards now surface whether review evidence is attached, missing, or absent.
-Digest output now also reports missing-evidence counts, pending UX gates, and the latest captured evidence references.
+Digest output now also reports missing-evidence counts, pending UX gates, the latest captured evidence references, and evidence capture timestamps.
 The sample state now includes an evidence-missing UX review so the digest/demo path exercises that signal by default.
 The hardcoded digest fallback now mirrors that same missing-evidence UX review case instead of reporting a cleaner story than the sample path.
 By default, the digest helper now prefers `/tmp/mission-control/state.json` when present before falling back to sample JSON.
