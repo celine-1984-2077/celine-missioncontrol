@@ -28,6 +28,7 @@ Current state:
 - notification digest previews can render push-friendly task/board summaries
 - review findings can promote improvement/spec-update follow-up tasks
 - initial local browser-review harness is documented under `docs/browser-review-harness.md`
+- overnight UX review evidence can be logged under `docs/reviews/`
 - roadmap/status is tracked in `docs/roadmap.md`
 - short-term export/import path is documented in `docs/state-export-bridge.md`
 - state transitions are validated against the canonical state machine
@@ -70,7 +71,9 @@ Review forms now explicitly remind operators when UX review is still required.
 Browser review commands can now be copied directly from the review form.
 Review artifact cards now flag missing evidence when a QA/UX run has no screenshot, snapshot, or evidence links attached.
 The dashboard now counts completed review runs that are still missing evidence.
-Digest output now also reports missing-evidence counts and names the first incomplete review runs.
+Review forms can now import the browser harness JSON artifact directly to prefill snapshot/screenshot evidence.
+Board cards now surface whether review evidence is attached, missing, or absent.
+Digest output now also reports missing-evidence counts, pending UX gates, and the latest captured evidence references.
 The sample state now includes an evidence-missing UX review so the digest/demo path exercises that signal by default.
 The hardcoded digest fallback now mirrors that same missing-evidence UX review case instead of reporting a cleaner story than the sample path.
 By default, the digest helper now prefers `/tmp/mission-control/state.json` when present before falling back to sample JSON.

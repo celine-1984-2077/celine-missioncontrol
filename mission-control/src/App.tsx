@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { addProgressEvent, autoPickNextTask, completeReviewRun, completeStep, completeUiTest, createFollowupTask, createTask, getBoardNotificationDigest, getTaskNotificationDigest, hasPassingReview, heartbeatRun, loadState, markRunStale, requestReviewRun, requestUiTest, transitionTask, updateTask } from './store'
+import { addProgressEvent, autoPickNextTask, completeReviewRun, completeStep, completeUiTest, createFollowupTask, createTask, getBoardNotificationDigest, getReviewEvidenceSummary, getTaskNotificationDigest, hasPassingReview, heartbeatRun, loadState, markRunStale, requestReviewRun, requestUiTest, transitionTask, updateTask } from './store'
 import type { ActivityEvent, DocSyncStatus, Priority, Task, TaskStatus, TaskType } from './types'
 
 const EXPORT_FILE_PATH = '/tmp/mission-control/state.json'
@@ -89,6 +89,7 @@ export function App() {
   const selectedTaskDigest = selectedTask ? getTaskNotificationDigest(state, selectedTask.id) : undefined
   const selectedTaskQaReady = selectedTask ? hasPassingReview(state, selectedTask.id, 'qa_review') : false
   const selectedTaskUxReady = selectedTask ? (!selectedTask.requiresUxReview || hasPassingReview(state, selectedTask.id, 'ux_review')) : false
+  const selectedTaskEvidence = selectedTask ? getReviewEvidenceSummary(state, selectedTask.id) : undefined
   const missingEvidenceCount = runs.filter((run) =>
     (run.kind === 'qa_review' || run.kind === 'ux_review') &&
     run.status !== 'running' &&
@@ -217,6 +218,35 @@ export function App() {
     URL.revokeObjectURL(url)
   }
 
+  async function importReviewArtifactFromFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      const raw = await file.text()
+      const parsed = JSON.parse(raw) as {
+        url?: string
+        data?: {
+          snapshot_id?: string
+          screenshot_path?: string
+        }
+      }
+
+      setReviewDraft((current) => ({
+        ...current,
+        targetUrl: parsed.url ?? current.targetUrl,
+        snapshotId: parsed.data?.snapshot_id ?? current.snapshotId,
+        screenshotPath: parsed.data?.screenshot_path ?? current.screenshotPath,
+        evidenceLinks: [current.evidenceLinks, file.name].filter(Boolean).join('\n'),
+      }))
+      setError('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to import review artifact JSON')
+    } finally {
+      event.target.value = ''
+    }
+  }
+
   async function copyText(text: string) {
     try {
       await navigator.clipboard.writeText(text)
@@ -262,29 +292,6 @@ export function App() {
       </section>
 
       {error && <div className="error-banner">{error}</div>}
-
-      <section className="composer card">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">Create task</p>
-            <h2>Minimum task intake contract</h2>
-          </div>
-          <span className="pill">local-first</span>
-        </div>
-
-        <form className="composer-grid" onSubmit={handleCreateTask}>
-          <label><span>Title</span><input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></label>
-          <label><span>Objective</span><input value={draft.objective} onChange={(e) => setDraft({ ...draft, objective: e.target.value })} /></label>
-          <label><span>Type</span><select value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value as TaskType })}><option value="code">code</option><option value="doc">doc</option><option value="research">research</option><option value="ops">ops</option><option value="bug">bug</option></select></label>
-          <label><span>Priority</span><select value={draft.priority} onChange={(e) => setDraft({ ...draft, priority: e.target.value as Priority })}><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="urgent">urgent</option></select></label>
-          <label><span>Initial status</span><select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as TaskStatus })}><option value="backlog">backlog</option><option value="triage">triage</option><option value="blocked">blocked</option></select></label>
-          <label className="checkbox-row"><input type="checkbox" checked={draft.needsUiTest} onChange={(e) => setDraft({ ...draft, needsUiTest: e.target.checked })} /><span>Needs UI test</span></label>
-          <label className="checkbox-row"><input type="checkbox" checked={draft.requiresApproval} onChange={(e) => setDraft({ ...draft, requiresApproval: e.target.checked })} /><span>Requires approval</span></label>
-          <label className="full-span"><span>Acceptance criteria (one per line)</span><textarea rows={4} value={draft.acceptanceCriteria} onChange={(e) => setDraft({ ...draft, acceptanceCriteria: e.target.value })} /></label>
-          <label className="full-span"><span>Boundaries (optional, one per line)</span><textarea rows={3} value={draft.boundaries} onChange={(e) => setDraft({ ...draft, boundaries: e.target.value })} /></label>
-          <div className="full-span actions-row"><button type="submit">Create task</button></div>
-        </form>
-      </section>
 
       <section className="runner-panel card">
         <div className="panel-heading"><div><p className="eyebrow">Runner Prototype</p><h2>Auto-pick and run tracking</h2></div><span className="pill">local prototype</span></div>
@@ -335,6 +342,7 @@ export function App() {
                       <p>{task.objective}</p>
                       <div className="meta-row"><span>{task.type}</span><span>{task.priority}</span>{task.needsUiTest && <span>ui test</span>}{task.requiresUxReview && <span>ux review</span>}</div>
                       <div className="meta-row"><span className={`pill ${task.docSyncStatus === 'needs_update' ? 'tone-red' : task.docSyncStatus === 'deferred' ? 'tone-slate' : 'tone-green'}`}>doc: {task.docSyncStatus ?? 'n/a'}</span>{task.requiresApproval && <span className="pill tone-red">approval</span>}</div>
+                      <div className="meta-row"><span className={`pill ${getReviewEvidenceSummary(state, task.id).missingEvidence ? 'tone-red' : getReviewEvidenceSummary(state, task.id).latestArtifact ? 'tone-green' : 'tone-slate'}`}>evidence: {getReviewEvidenceSummary(state, task.id).missingEvidence ? 'missing' : getReviewEvidenceSummary(state, task.id).latestArtifact ? 'attached' : 'none'}</span></div>
                     </article>
                   ))}
                 </div>
@@ -354,6 +362,29 @@ export function App() {
           <section className="subpanel"><div className="subpanel-header"><h3>Push Digest Preview</h3></div><div className="digest-list">{boardDigest.lines.map((line) => (<div key={line} className="digest-item"><span>{line}</span></div>))}</div></section>
         </aside>
       </main>
+
+      <section className="composer card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Create task</p>
+            <h2>Minimum task intake contract</h2>
+          </div>
+          <span className="pill">local-first</span>
+        </div>
+
+        <form className="composer-grid" onSubmit={handleCreateTask}>
+          <label><span>Title</span><input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></label>
+          <label><span>Objective</span><input value={draft.objective} onChange={(e) => setDraft({ ...draft, objective: e.target.value })} /></label>
+          <label><span>Type</span><select value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value as TaskType })}><option value="code">code</option><option value="doc">doc</option><option value="research">research</option><option value="ops">ops</option><option value="bug">bug</option></select></label>
+          <label><span>Priority</span><select value={draft.priority} onChange={(e) => setDraft({ ...draft, priority: e.target.value as Priority })}><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="urgent">urgent</option></select></label>
+          <label><span>Initial status</span><select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as TaskStatus })}><option value="backlog">backlog</option><option value="triage">triage</option><option value="blocked">blocked</option></select></label>
+          <label className="checkbox-row"><input type="checkbox" checked={draft.needsUiTest} onChange={(e) => setDraft({ ...draft, needsUiTest: e.target.checked })} /><span>Needs UI test</span></label>
+          <label className="checkbox-row"><input type="checkbox" checked={draft.requiresApproval} onChange={(e) => setDraft({ ...draft, requiresApproval: e.target.checked })} /><span>Requires approval</span></label>
+          <label className="full-span"><span>Acceptance criteria (one per line)</span><textarea rows={4} value={draft.acceptanceCriteria} onChange={(e) => setDraft({ ...draft, acceptanceCriteria: e.target.value })} /></label>
+          <label className="full-span"><span>Boundaries (optional, one per line)</span><textarea rows={3} value={draft.boundaries} onChange={(e) => setDraft({ ...draft, boundaries: e.target.value })} /></label>
+          <div className="full-span actions-row"><button type="submit">Create task</button></div>
+        </form>
+      </section>
 
       {selectedTask && (
         <section className="detail-panel card">
@@ -408,6 +439,16 @@ export function App() {
                   </div>
                   <code>./mission-control/scripts/browser-review.sh {reviewDraft.targetUrl || 'http://127.0.0.1:4173/'}</code>
                   <p className="muted">Run the harness, then paste the screenshot path, snapshot ID, and any evidence links back here.</p>
+                  <label>
+                    <span>Import harness JSON (optional)</span>
+                    <input type="file" accept="application/json" onChange={importReviewArtifactFromFile} />
+                  </label>
+                  {selectedTaskEvidence?.latestArtifact && (
+                    <p className="muted">Latest saved evidence: {selectedTaskEvidence.latestArtifact.snapshotId ?? selectedTaskEvidence.latestArtifact.screenshotPath ?? 'artifact attached'}</p>
+                  )}
+                  {selectedTaskEvidence?.missingEvidence && (
+                    <p className="missing-evidence">Latest completed review still has no screenshot, snapshot, or evidence link attached.</p>
+                  )}
                   {selectedTask.requiresUxReview && !selectedTaskUxReady && (
                     <p className="ux-review-reminder">UX review is still required for this task. Don’t stop at QA pass only.</p>
                   )}

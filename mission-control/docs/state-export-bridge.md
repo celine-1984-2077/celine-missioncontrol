@@ -68,7 +68,8 @@ This keeps the system local-first while unlocking:
 2. write current state to `/tmp/mission-control/state.json`
 3. ✅ update `render-digest.mjs` to default to that file before falling back to sample JSON
 4. document the export path in README and browser-review harness docs
-5. only then add a narrow artifact-import helper
+5. ✅ add a narrow review-artifact import helper in the UI for harness JSON
+6. next: replace manual download/import with a stable file write/read bridge
 
 ## Non-goals for this slice
 

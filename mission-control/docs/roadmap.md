@@ -31,6 +31,7 @@ Advance Mission Control from a local board prototype into an autonomous review/d
 ### 2. UX review involvement as a required lane
 - make UX review expectation visible on UI work
 - surface per-task UX gate status in board/detail UI and notification previews
+- keep the latest UX/QA evidence reference visible so overnight review passes are not "trust me" only
 - separate must-fix UX findings from polish
 - promote serious UX findings into improvement tasks with evidence attached
 

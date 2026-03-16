@@ -71,6 +71,27 @@ function hasPassingReview(state, taskId, kind) {
   return state.runs.some((run) => run.taskId === taskId && run.kind === kind && run.status === 'passed')
 }
 
+function getReviewEvidenceSummary(state, taskId, kind) {
+  const reviewRuns = state.runs
+    .filter((run) => run.taskId === taskId && (run.kind === 'qa_review' || run.kind === 'ux_review') && (!kind || run.kind === kind))
+    .sort((a, b) => {
+      const aTime = a.endedAt || a.startedAt || ''
+      const bTime = b.endedAt || b.startedAt || ''
+      return bTime.localeCompare(aTime)
+    })
+
+  const latestCompletedRun = reviewRuns.find((run) => run.status !== 'running')
+  const latestArtifact = latestCompletedRun?.artifact
+  const missingEvidence = Boolean(
+    latestCompletedRun &&
+    !latestArtifact?.screenshotPath &&
+    !latestArtifact?.snapshotId &&
+    !(latestArtifact?.evidenceLinks?.length)
+  )
+
+  return { latestCompletedRun, latestArtifact, missingEvidence }
+}
+
 function getBoardNotificationDigest(state) {
   const blocked = state.tasks.filter((task) => task.status === 'blocked')
   const inProgress = state.tasks.filter((task) => task.status === 'in_progress')
@@ -82,6 +103,9 @@ function getBoardNotificationDigest(state) {
     !run.artifact?.snapshotId &&
     !(run.artifact?.evidenceLinks?.length)
   )
+  const evidenceReadyTasks = state.tasks
+    .map((task) => ({ task, review: getReviewEvidenceSummary(state, task.id) }))
+    .filter(({ review }) => review.latestArtifact?.snapshotId || review.latestArtifact?.screenshotPath)
   const latestEvents = state.activity.slice(0, 3).map((event) => `${event.taskId}: ${event.title}`)
 
   return {
@@ -90,7 +114,9 @@ function getBoardNotificationDigest(state) {
       `source=${fileHint(statePath, requestedPath)}`,
       `in_progress=${inProgress.length} blocked=${blocked.length} pending_ux=${pendingUx.length} missing_evidence=${missingEvidence.length}`,
       ...blocked.slice(0, 2).map((task) => `blocked: ${task.id} ${task.blockerDetail || task.title}`),
+      ...pendingUx.slice(0, 2).map((task) => `ux gate: ${task.id} awaiting UX review pass`),
       ...missingEvidence.slice(0, 2).map((run) => `missing evidence: ${run.taskId} ${run.kind} ${run.id}`),
+      ...evidenceReadyTasks.slice(0, 2).map(({ task, review }) => `latest evidence: ${task.id} ${review.latestArtifact.snapshotId || review.latestArtifact.screenshotPath}`),
       ...inProgress.slice(0, 2).map((task) => `active: ${task.id} next=${task.nextStep || 'unset'}`),
       ...latestEvents,
     ],

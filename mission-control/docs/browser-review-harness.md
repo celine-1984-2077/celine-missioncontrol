@@ -47,9 +47,9 @@ The harness now saves:
 
 Recommended review loop:
 1. run the harness against the local app
-2. paste screenshot path, snapshot id, target URL, and any evidence links into the Mission Control review form
+2. import the saved JSON artifact into the Mission Control review form (or paste screenshot path / snapshot id manually)
 3. submit QA or UX review result
-4. verify the task-level notification preview reflects updated review gates
+4. verify the task-level notification preview reflects updated review gates and evidence references
 5. create follow-up improvement/spec-update tasks when findings require it
 
 UX review expectation:
