@@ -386,7 +386,6 @@ export function App() {
               <div className="attention-row"><strong>Blocked</strong><span>{tasks.filter((task) => task.status === 'blocked').length}</span></div>
               <div className="attention-row"><strong>Pending UX</strong><span>{tasks.filter((task) => task.requiresUxReview && !hasPassingReview(state, task.id, 'ux_review')).length}</span></div>
               <div className="attention-row"><strong>Missing Evidence</strong><span>{missingEvidenceCount}</span></div>
-              <div className="attention-row next-action"><strong>Next Action</strong><span>{boardDigest.nextAction ?? 'No urgent action'}</span></div>
             </div>
           </section>
 
@@ -414,104 +413,10 @@ export function App() {
                 <div className="read-sections">
                   <DetailSection title="Objective"><p>{selectedTask.objective}</p></DetailSection>
                   <DetailSection title="Acceptance Criteria"><ul>{selectedTask.acceptanceCriteria.map((item) => <li key={item}>{item}</li>)}</ul></DetailSection>
-                  <DetailSection title="Review Artifacts">
-                    {latestReviewRuns.length ? latestReviewRuns.slice(0, 2).map((run) => (
-                      <article key={run.id} className="artifact-item">
-                        <div className="meta-row wrap"><strong>{run.kind}</strong><span className="pill">{run.status}</span></div>
-                        <p>{run.artifact?.reviewSummary || run.summary || 'No summary yet.'}</p>
-                        {run.artifact?.snapshotId && <p className="muted">Snapshot: {run.artifact.snapshotId}</p>}
-                        {run.artifact?.screenshotPath && <p className="muted">Screenshot: {run.artifact.screenshotPath}</p>}
-                      </article>
-                    )) : <p className="muted">No review artifacts saved yet.</p>}
-                  </DetailSection>
-                  <DetailSection title="Notification Preview">
-                    {selectedTaskDigest ? <ul>{selectedTaskDigest.lines.map((line) => <li key={line}>{line}</li>)}</ul> : <p className="muted">No digest yet.</p>}
-                  </DetailSection>
                 </div>
-
-                <details className="admin-tools">
-                  <summary>System / Admin tools</summary>
-                  <section className="tooling-stack">
-                    <div className="transition-row wrap">
-                      {transitionTargets[selectedTask.status].map((nextStatus) => (<button key={nextStatus} type="button" className="secondary" onClick={() => handleTransition(selectedTask.id, nextStatus)}>Move to {formatStatus(nextStatus)}</button>))}
-                    </div>
-                    <div className="transition-row wrap">
-                      {selectedTask.needsUiTest && <button type="button" onClick={() => setState(requestUiTest(state, selectedTask.id))}>Start browser test</button>}
-                      {selectedTask.needsUiTest && <button type="button" className="secondary" onClick={() => setState(completeUiTest(state, selectedTask.id, true))}>Mark browser test passed</button>}
-                      {selectedTask.needsUiTest && <button type="button" className="secondary" onClick={() => setState(completeUiTest(state, selectedTask.id, false))}>Mark browser test failed</button>}
-                      <button type="button" onClick={() => setState(requestReviewRun(state, selectedTask.id, 'qa_review'))}>Start QA review</button>
-                      <button type="button" className="secondary" onClick={() => setState(requestReviewRun(state, selectedTask.id, 'ux_review'))}>Start UX review</button>
-                    </div>
-
-                    <form className="detail-form" onSubmit={handleUpdateTask}>
-                      <label><span>Title</span><input value={editDraft.title} onChange={(e) => setEditDraft({ ...editDraft, title: e.target.value })} /></label>
-                      <label><span>Objective</span><textarea rows={3} value={editDraft.objective} onChange={(e) => setEditDraft({ ...editDraft, objective: e.target.value })} /></label>
-                      <label><span>Acceptance Criteria</span><textarea rows={4} value={editDraft.acceptanceCriteria} onChange={(e) => setEditDraft({ ...editDraft, acceptanceCriteria: e.target.value })} /></label>
-                      <label><span>Boundaries</span><textarea rows={3} value={editDraft.boundaries} onChange={(e) => setEditDraft({ ...editDraft, boundaries: e.target.value })} /></label>
-                      <label><span>Next Step</span><input value={editDraft.nextStep} onChange={(e) => setEditDraft({ ...editDraft, nextStep: e.target.value })} /></label>
-                      <div className="actions-row"><button type="submit">Save task details</button></div>
-                    </form>
-
-                    <form className="detail-form" onSubmit={(e) => { handleProgressSubmit(e) }}>
-                      <label><span>Progress update</span><textarea rows={3} value={progressText} onChange={(e) => setProgressText(e.target.value)} /></label>
-                      <label><span>Next step</span><input value={progressNextStep} onChange={(e) => setProgressNextStep(e.target.value)} /></label>
-                      <div className="actions-row"><button type="submit">Add progress</button></div>
-                    </form>
-
-                    <form className="detail-form">
-                      <label><span>Target URL</span><input value={reviewDraft.targetUrl} onChange={(e) => setReviewDraft({ ...reviewDraft, targetUrl: e.target.value })} /></label>
-                      <label><span>Review summary</span><textarea rows={3} value={reviewDraft.summary} onChange={(e) => setReviewDraft({ ...reviewDraft, summary: e.target.value })} /></label>
-                      <label><span>Findings</span><textarea rows={3} value={reviewDraft.findings} onChange={(e) => setReviewDraft({ ...reviewDraft, findings: e.target.value })} /></label>
-                      <label><span>Screenshot path</span><input value={reviewDraft.screenshotPath} onChange={(e) => setReviewDraft({ ...reviewDraft, screenshotPath: e.target.value })} /></label>
-                      <label><span>Snapshot ID</span><input value={reviewDraft.snapshotId} onChange={(e) => setReviewDraft({ ...reviewDraft, snapshotId: e.target.value })} /></label>
-                      <label><span>Evidence links</span><textarea rows={2} value={reviewDraft.evidenceLinks} onChange={(e) => setReviewDraft({ ...reviewDraft, evidenceLinks: e.target.value })} /></label>
-                      <label><span>Import harness JSON</span><input type="file" accept="application/json" onChange={importReviewArtifactFromFile} /></label>
-                      <div className="actions-row wrap">
-                        {runs.filter((run) => run.taskId === selectedTask.id && run.status === 'running' && (run.kind === 'qa_review' || run.kind === 'ux_review')).map((run) => (
-                          <div key={run.id} className="transition-row">
-                            {run.kind === 'qa_review' && <button type="button" onClick={() => submitReview(run.id, 'pass')}>Submit QA pass</button>}
-                            {run.kind === 'qa_review' && <button type="button" className="secondary" onClick={() => submitReview(run.id, 'fail')}>Submit QA fail</button>}
-                            {run.kind === 'ux_review' && <button type="button" onClick={() => submitReview(run.id, 'submit')}>Submit UX review</button>}
-                          </div>
-                        ))}
-                        <button type="button" className="secondary" onClick={() => setState(createFollowupTask(state, selectedTask.id, 'improvement', `Improve: ${selectedTask.title}`, reviewDraft.summary || 'UX improvement requested from review.'))}>Create improvement task</button>
-                        <button type="button" className="secondary" onClick={() => setState(createFollowupTask(state, selectedTask.id, 'spec_update', `Spec update: ${selectedTask.title}`, reviewDraft.summary || 'Spec update requested from review.'))}>Create spec-update task</button>
-                      </div>
-                    </form>
-                  </section>
-                </details>
               </div>
             )}
           </section>
-        </section>
-
-        <section className="card-shell bottom-tools">
-          <div className="panel-heading"><div><p className="eyebrow">System / Admin</p><h2>Export, runner, and debug tooling</h2></div></div>
-          <div className="tool-grid">
-            <section className="tool-card">
-              <h3>State Export</h3>
-              <p className="muted">Bridge current board state to shell tools.</p>
-              <button type="button" onClick={handleExportState}>Export state JSON</button>
-              <p className="muted small">Target path: {EXPORT_FILE_PATH}</p>
-            </section>
-            <section className="tool-card">
-              <h3>Runner Prototype</h3>
-              <p className="muted">Auto-pick and run tracking.</p>
-              <button type="button" onClick={() => setState(autoPickNextTask(state))}>Auto-pick next triage task</button>
-              <div className="digest-list compact-list">
-                {runs.slice(0, 4).map((run) => <div key={run.id} className="digest-item"><strong>{run.id}</strong><span>{run.kind} · {run.status}</span></div>)}
-              </div>
-            </section>
-            <section className="tool-card">
-              <h3>Quick Create</h3>
-              <form className="detail-form" onSubmit={handleCreateTask}>
-                <input placeholder="Title" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
-                <input placeholder="Objective" value={draft.objective} onChange={(e) => setDraft({ ...draft, objective: e.target.value })} />
-                <textarea rows={2} placeholder="Acceptance criteria" value={draft.acceptanceCriteria} onChange={(e) => setDraft({ ...draft, acceptanceCriteria: e.target.value })} />
-                <button type="submit">Create task</button>
-              </form>
-            </section>
-          </div>
         </section>
       </main>
     </div>
