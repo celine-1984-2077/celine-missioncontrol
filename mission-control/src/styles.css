@@ -85,3 +85,16 @@ h1,h2,h3,h4,p { margin: 0; }
   .board-and-activity, .stats-strip, .kanban-grid, .two-col { grid-template-columns: 1fr; }
   .tasks-title { font-size: 2.1rem; }
 }
+
+.docs-layout { display: grid; grid-template-columns: 320px 1fr; gap: 12px; }
+.docs-left, .docs-right { min-height: 80vh; }
+.docs-search { margin-bottom: 12px; }
+.project-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.chip-button { border: 1px solid transparent; }
+.docs-list { display: flex; flex-direction: column; gap: 10px; }
+.doc-list-item { background: rgba(10,15,31,.5); border: 1px solid rgba(130,152,228,.08); border-radius: 14px; padding: 12px; cursor: pointer; }
+.doc-reader { margin-top: 16px; display: flex; flex-direction: column; gap: 14px; }
+.doc-reader h1 { font-size: 2rem; }
+.doc-reader h2 { font-size: 1.2rem; }
+.doc-reader p, .doc-reader li { color: #d3dcf4; line-height: 1.6; }
+@media (max-width: 1100px) { .docs-layout { grid-template-columns: 1fr; } }
