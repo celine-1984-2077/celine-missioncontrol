@@ -6,10 +6,9 @@ const EXPORT_FILE_PATH = '/tmp/mission-control/state.json'
 
 const columns: Array<{ key: TaskStatus; label: string }> = [
   { key: 'backlog', label: 'Backlog' },
-  { key: 'triage', label: 'Triage' },
   { key: 'in_progress', label: 'In Progress' },
-  { key: 'blocked', label: 'Blocked' },
-  { key: 'done', label: 'Done' },
+  { key: 'blocked', label: 'Review' },
+  { key: 'done', label: 'Testing' },
 ]
 
 const statusTone: Record<TaskStatus, string> = {
@@ -60,8 +59,24 @@ const initialDraft = {
   needsUiTest: true,
 }
 
+const navItems = ['Tasks', 'Content', 'Approvals', 'Council', 'Calendar', 'Docs', 'People', 'Todo', 'Office']
+
 function formatStatus(status: TaskStatus) {
   return status.replace('_', ' ')
+}
+
+function formatRelativeish(value?: string) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const diff = Math.max(0, Date.now() - date.getTime())
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  return `${days}d ago`
 }
 
 export function App() {
@@ -78,25 +93,25 @@ export function App() {
   const runs = state.runs
   const nowRunning = useMemo(() => tasks.find((task) => task.status === 'in_progress'), [tasks])
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? nowRunning ?? tasks[0]
+  const selectedTaskEvidence = selectedTask ? getReviewEvidenceSummary(state, selectedTask.id) : undefined
   const doneDigest = tasks.filter((task) => task.status === 'done').slice(0, 3)
+  const boardDigest = getBoardNotificationDigest(state)
+  const selectedTaskDigest = selectedTask ? getTaskNotificationDigest(state, selectedTask.id) : undefined
+  const selectedTaskQaReady = selectedTask ? hasPassingReview(state, selectedTask.id, 'qa_review') : false
+  const selectedTaskUxReady = selectedTask ? (!selectedTask.requiresUxReview || hasPassingReview(state, selectedTask.id, 'ux_review')) : false
+  const missingEvidenceCount = runs.filter((run) =>
+    (run.kind === 'qa_review' || run.kind === 'ux_review') &&
+    run.status !== 'running' &&
+    !run.artifact?.screenshotPath &&
+    !run.artifact?.snapshotId &&
+    !(run.artifact?.evidenceLinks?.length),
+  ).length
   const reviewRunsForTask = runs.filter((run) => run.taskId === selectedTask?.id && (run.kind === 'qa_review' || run.kind === 'ux_review'))
   const latestReviewRuns = [...reviewRunsForTask].sort((a, b) => {
     const aTime = a.endedAt ?? a.startedAt ?? ''
     const bTime = b.endedAt ?? b.startedAt ?? ''
     return bTime.localeCompare(aTime)
   })
-  const boardDigest = getBoardNotificationDigest(state)
-  const selectedTaskDigest = selectedTask ? getTaskNotificationDigest(state, selectedTask.id) : undefined
-  const selectedTaskQaReady = selectedTask ? hasPassingReview(state, selectedTask.id, 'qa_review') : false
-  const selectedTaskUxReady = selectedTask ? (!selectedTask.requiresUxReview || hasPassingReview(state, selectedTask.id, 'ux_review')) : false
-  const selectedTaskEvidence = selectedTask ? getReviewEvidenceSummary(state, selectedTask.id) : undefined
-  const missingEvidenceCount = runs.filter((run) =>
-    (run.kind === 'qa_review' || run.kind === 'ux_review') &&
-    run.status !== 'running' &&
-    !run.artifact?.screenshotPath &&
-    !run.artifact?.snapshotId &&
-    !(run.artifact?.evidenceLinks?.length)
-  ).length
 
   const [editDraft, setEditDraft] = useState(() => createEditDraft(selectedTask))
 
@@ -128,7 +143,6 @@ export function App() {
       setError('Title, objective, and acceptance criteria are required.')
       return
     }
-
     const nextState = createTask(state, {
       title: draft.title.trim(),
       objective: draft.objective.trim(),
@@ -140,7 +154,6 @@ export function App() {
       requiresApproval: draft.requiresApproval,
       needsUiTest: draft.needsUiTest,
     })
-
     const created = nextState.tasks[0]
     setState(nextState)
     setSelectedTaskId(created.id)
@@ -171,15 +184,12 @@ export function App() {
     setState(nextState)
     setProgressText('')
     setProgressNextStep('')
-    setReviewDraft({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '', targetUrl: 'http://127.0.0.1:4173/' })
   }
 
   function handleCompleteStep(stepId: string) {
     if (!selectedTask) return
-    const nextState = completeStep(state, selectedTask.id, stepId)
-    setState(nextState)
+    setState(completeStep(state, selectedTask.id, stepId))
   }
-
 
   function submitReview(runId: string, outcome: 'pass' | 'fail' | 'submit') {
     const nextState = completeReviewRun(state, runId, outcome, {
@@ -187,10 +197,7 @@ export function App() {
       findings: reviewDraft.findings,
       screenshotPath: reviewDraft.screenshotPath,
       snapshotId: reviewDraft.snapshotId,
-      evidenceLinks: reviewDraft.evidenceLinks
-        .split('\n')
-        .map((item) => item.trim())
-        .filter(Boolean),
+      evidenceLinks: reviewDraft.evidenceLinks.split('\n').map((item) => item.trim()).filter(Boolean),
       targetUrl: reviewDraft.targetUrl.trim(),
     })
     setState(nextState)
@@ -198,15 +205,7 @@ export function App() {
   }
 
   function handleExportState() {
-    const payload = {
-      tasks: state.tasks,
-      runs: state.runs,
-      activity: state.activity,
-      exportedAt: new Date().toISOString(),
-      sourceVersion: 'mission-control-local-v1',
-      exportPathHint: EXPORT_FILE_PATH,
-    }
-
+    const payload = { tasks: state.tasks, runs: state.runs, activity: state.activity, exportedAt: new Date().toISOString(), sourceVersion: 'mission-control-local-v1', exportPathHint: EXPORT_FILE_PATH }
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -221,17 +220,9 @@ export function App() {
   async function importReviewArtifactFromFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
-
     try {
       const raw = await file.text()
-      const parsed = JSON.parse(raw) as {
-        url?: string
-        data?: {
-          snapshot_id?: string
-          screenshot_path?: string
-        }
-      }
-
+      const parsed = JSON.parse(raw) as { url?: string; data?: { snapshot_id?: string; screenshot_path?: string } }
       setReviewDraft((current) => ({
         ...current,
         targetUrl: parsed.url ?? current.targetUrl,
@@ -248,339 +239,281 @@ export function App() {
   }
 
   async function copyText(text: string) {
-    try {
-      await navigator.clipboard.writeText(text)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to copy text')
-    }
+    try { await navigator.clipboard.writeText(text) } catch (err) { setError(err instanceof Error ? err.message : 'Failed to copy text') }
   }
 
   function formatDigestForCopy(headline: string, lines: string[], nextAction?: string) {
     return [`**${headline}**`, ...lines.map((line) => `- ${line}`), ...(nextAction ? [`- next_action: ${nextAction}`] : [])].join('\n')
   }
 
-  return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Tony × Celine</p>
-          <h1>Mission Control</h1>
-          <p className="subtitle">Owner-first Mission Control: needs attention, now running, board, and activity come first.</p>
-        </div>
-        <div className="topbar-stats">
-          <Stat label="Tasks" value={String(tasks.length)} />
-          <Stat label="In Progress" value={String(tasks.filter((t) => t.status === 'in_progress').length)} />
-          <Stat label="Needs Doc Sync" value={String(tasks.filter((t) => t.docSyncStatus === 'needs_update').length)} />
-          <Stat label="Pending UX" value={String(tasks.filter((t) => t.requiresUxReview && !hasPassingReview(state, t.id, 'ux_review')).length)} />
-          <Stat label="Missing Evidence" value={String(missingEvidenceCount)} />
-        </div>
-      </header>
+  const stats = {
+    week: 48,
+    inProgress: tasks.filter((t) => t.status === 'in_progress').length,
+    total: tasks.length,
+    completion: `${Math.round((tasks.filter((t) => t.status === 'done').length / Math.max(1, tasks.length)) * 100)}%`,
+  }
 
-      <section className="runner-panel card">
-        <div className="panel-heading"><div><p className="eyebrow">Runner Prototype</p><h2>System tooling</h2></div><span className="pill">local prototype</span></div>
-        <div className="runner-grid">
-          <div className="subpanel">
-            <div className="subpanel-header"><h3>Controls</h3></div>
-            <div className="transition-row">
-              <button type="button" onClick={() => setState(autoPickNextTask(state))}>Auto-pick next triage task</button>
-            </div>
+  const boardTasks = {
+    backlog: tasks.filter((t) => t.status === 'backlog' || t.status === 'triage'),
+    in_progress: tasks.filter((t) => t.status === 'in_progress'),
+    blocked: tasks.filter((t) => t.status === 'blocked'),
+    done: tasks.filter((t) => t.status === 'done'),
+  }
+
+  return (
+    <div className="mission-shell">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <p className="eyebrow">TONY × CÉLINE</p>
+          <h1>Mission Control</h1>
+        </div>
+        <nav className="sidebar-nav">
+          {navItems.map((item, index) => (
+            <button key={item} className={`nav-item ${index === 0 ? 'active' : ''}`}>{item}</button>
+          ))}
+        </nav>
+        <div className="sidebar-footer muted">… More</div>
+      </aside>
+
+      <main className="main-shell">
+        <header className="tasks-header card-shell">
+          <div>
+            <h2 className="tasks-title">Tasks</h2>
+            <p className="subtitle">Organize work and track progress</p>
           </div>
-          <div className="subpanel">
-            <div className="subpanel-header"><h3>Runs</h3><span>{runs.length}</span></div>
-            <div className="digest-list">
-              {runs.map((run) => (
-                <div key={run.id} className="run-card">
-                  <div className="meta-row"><strong>{run.id}</strong><span className="pill">{run.kind}</span><span className="pill">{run.status}</span></div>
-                  <p className="muted">Task: {run.taskId}</p>
-                  {run.kind === 'ui_test' && <p className="muted">required browser validation</p>}
-                  <p className="muted">Heartbeat: {run.heartbeatAt ?? 'n/a'}</p>
-                  {run.artifact?.snapshotId && <p className="muted">Snapshot: {run.artifact.snapshotId}</p>}
-                  {run.artifact?.screenshotPath && <p className="muted">Shot: {run.artifact.screenshotPath}</p>}
-                  <div className="transition-row">
-                    {run.status === 'running' && <button type="button" className="secondary small-button" onClick={() => setState(heartbeatRun(state, run.id))}>Heartbeat</button>}
-                    {run.status === 'running' && run.kind === 'execution' && <button type="button" className="secondary small-button" onClick={() => setState(markRunStale(state, run.id))}>Mark stale</button>}
-                    {run.status === 'running' && run.kind === 'qa_review' && <button type="button" className="secondary small-button" onClick={() => setState(completeReviewRun(state, run.id, 'pass'))}>QA pass</button>}
-                    {run.status === 'running' && run.kind === 'qa_review' && <button type="button" className="secondary small-button" onClick={() => setState(completeReviewRun(state, run.id, 'fail'))}>QA fail</button>}
-                    {run.status === 'running' && run.kind === 'ux_review' && <button type="button" className="secondary small-button" onClick={() => setState(completeReviewRun(state, run.id, 'submit'))}>Submit UX review</button>}
+          <div className="header-actions">
+            <span className="pill">🌙 Dark</span>
+            <span className="pill">EN</span>
+            <button className="secondary">Run Smoke Test</button>
+            <button>+ New Task</button>
+          </div>
+        </header>
+
+        <section className="stats-strip card-shell">
+          <StatBig label="This week" value={String(stats.week)} accent="green" />
+          <StatBig label="In progress" value={String(stats.inProgress)} accent="blue" />
+          <StatBig label="Total" value={String(stats.total)} accent="white" />
+          <StatBig label="Completion" value={stats.completion} accent="purple" />
+        </section>
+
+        <section className="filters-row card-shell">
+          <div className="chips-row">
+            <span className="pill active-chip">All</span>
+            <span className="pill">Scan</span>
+            <span className="pill">Progress</span>
+            <span className="pill">Done</span>
+            <span className="pill">All projects</span>
+            <span className="pill">Stale &lt; 45m</span>
+          </div>
+          <div className="chips-row muted small">
+            <span>Autopilot scans backlog every 1m</span>
+            <span>Last refresh: {formatRelativeish(activity[0]?.createdAt)}</span>
+            <span>Next scan: 52s</span>
+          </div>
+        </section>
+
+        <section className="board-and-activity">
+          <section className="board-panel wide-card">
+            <div className="kanban-grid">
+              {columns.map((column) => (
+                <div key={column.key} className="kanban-column">
+                  <div className="kanban-header">{column.label}</div>
+                  <div className="kanban-body">
+                    {(boardTasks[column.key as keyof typeof boardTasks] ?? []).map((task) => (
+                      <article key={task.id} className={`kanban-card ${selectedTask?.id === task.id ? 'selected-card' : ''}`} onClick={() => handleSelectTask(task.id)}>
+                        <h3>{task.title}</h3>
+                        <div className="kanban-meta">
+                          <span>Objective</span>
+                          <p>{task.objective}</p>
+                        </div>
+                        <div className="kanban-meta">
+                          <span>Plan</span>
+                          <p>{task.plan.slice(0, 3).map((step, idx) => `${idx + 1}) ${step.label}`).join('\n')}</p>
+                        </div>
+                        <div className="card-signal compact"><strong>Next:</strong> {task.nextStep ?? 'Next step pending…'}</div>
+                        {task.blockerDetail && <div className="card-signal blocker-signal"><strong>Blocked:</strong> {task.blockerDetail}</div>}
+                        <div className="live-pill">Live activity: [{task.requiresUxReview ? 'UX' : 'QA'} Plan]</div>
+                        <div className="tag-row">
+                          <span className="tag">{task.priority}</span>
+                          <span className="tag">Céline</span>
+                          <span className="tag">MissionControl</span>
+                        </div>
+                      </article>
+                    ))}
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-      </section>
-
-      <main className="layout">
-        <section className="board-panel card">
-          <div className="panel-heading"><div><p className="eyebrow">Board</p><h2>Canonical states</h2></div><span className="pill">validated transitions</span></div>
-          <div className="board-grid">
-            {columns.map((column) => (
-              <div key={column.key} className="board-column">
-                <div className="column-header"><h3>{column.label}</h3><span>{tasks.filter((task) => task.status === column.key).length}</span></div>
-                <div className="column-cards">
-                  {tasks.filter((task) => task.status === column.key).map((task) => (
-                    <article key={task.id} className={`task-card ${selectedTask?.id === task.id ? 'selected-card' : ''}`} onClick={() => handleSelectTask(task.id)}>
-                      <div className="task-card-header"><span className={`pill ${statusTone[task.status]}`}>{formatStatus(task.status)}</span><span className="task-id">{task.id}</span></div>
-                      <h4>{task.title}</h4>
-                      <p>{task.objective}</p>
-                      <div className="meta-row"><span>{task.type}</span><span>{task.priority}</span>{task.needsUiTest && <span>ui test</span>}{task.requiresUxReview && <span>ux review</span>}</div>
-                      <div className="meta-row"><span className={`pill ${task.docSyncStatus === 'needs_update' ? 'tone-red' : task.docSyncStatus === 'deferred' ? 'tone-slate' : 'tone-green'}`}>doc: {task.docSyncStatus ?? 'n/a'}</span>{task.requiresApproval && <span className="pill tone-red">approval</span>}{task.requiresUxReview && !hasPassingReview(state, task.id, 'ux_review') && <span className="pill tone-amber">waiting on UX</span>}</div>
-                      <div className="card-signal"><strong>Next:</strong> {task.nextStep ?? 'unset'}</div>
-                      <div className="card-signal"><strong>Last:</strong> {task.lastEventAt}</div>
-                      {task.blockerDetail && <div className="card-signal blocker-signal"><strong>Blocked:</strong> {task.blockerDetail}</div>}
-                      <div className="meta-row"><span className={`pill ${getReviewEvidenceSummary(state, task.id).missingEvidence ? 'tone-red' : getReviewEvidenceSummary(state, task.id).latestArtifact ? 'tone-green' : 'tone-slate'}`}>evidence: {getReviewEvidenceSummary(state, task.id).missingEvidence ? 'missing' : getReviewEvidenceSummary(state, task.id).latestArtifact ? 'attached' : 'none'}</span></div>
-                    </article>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <aside className="activity-panel card">
-          <div className="panel-heading"><div><p className="eyebrow">Activity</p><h2>Operator visibility</h2></div></div>
-          <section className="subpanel now-running">
-            <div className="subpanel-header"><h3>Now Running</h3>{nowRunning ? <span className="pill tone-amber">active</span> : <span className="pill">idle</span>}</div>
-            {nowRunning ? <><h4>{nowRunning.title}</h4><p>Step {(nowRunning.currentStepIndex ?? 0) + 1}/{nowRunning.plan.length}</p><p className="muted">Next: {nowRunning.nextStep ?? 'Not set yet'}</p><p className="muted">Last event: {nowRunning.lastEventAt}</p></> : <p className="muted">No active task.</p>}
           </section>
-          <section className="subpanel"><div className="subpanel-header"><h3>Recent Updates</h3></div><div className="timeline">{activity.slice(0, 10).map((event) => (<div key={event.id} className="timeline-item"><div className={`timeline-dot ${eventTone[event.type] ?? 'tone-slate'}`} /><div><div className="timeline-title-row"><strong>{event.title}</strong><span className="task-id">{event.taskId}</span></div>{event.body && <p>{event.body}</p>}<span className="muted small">{event.createdAt}</span></div></div>))}</div></section>
-          <section className="subpanel"><div className="subpanel-header"><h3>Done Digest</h3></div><div className="digest-list">{doneDigest.map((task) => (<div key={task.id} className="digest-item"><strong>{task.id}</strong><span>{task.title}</span></div>))}</div></section>
-          <section className="subpanel"><div className="subpanel-header"><h3>Push Digest Preview</h3></div><div className="digest-list">{boardDigest.lines.map((line) => (<div key={line} className="digest-item"><span>{line}</span></div>))}{boardDigest.nextAction && <div className="digest-item"><strong>next action</strong><span>{boardDigest.nextAction}</span></div>}</div></section>
-        </aside>
-      </main>
 
-      <section className="card export-panel">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">State Export</p>
-            <h2>Bridge current board state to shell tools</h2>
-          </div>
-          <div className="transition-row compact-actions">
-            <button type="button" onClick={handleExportState}>Export state JSON</button>
-            <button type="button" className="secondary" onClick={() => copyText(formatDigestForCopy(boardDigest.headline, boardDigest.lines, boardDigest.nextAction))}>Copy board digest</button>
-          </div>
-        </div>
-        <p className="muted">Downloads a JSON snapshot that shell helpers can read now. Target file path for the bridge plan: {EXPORT_FILE_PATH}</p>
-        <p className="bridge-blocker">Current blocker: export is still a manual browser download, so shell tools cannot yet rely on {EXPORT_FILE_PATH} being refreshed automatically.</p>
-      </section>
-
-      {error && <div className="error-banner">{error}</div>}
-
-      <section className="card priority-panel">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">Needs Attention</p>
-            <h2>What Tony should look at first</h2>
-          </div>
-          <span className="pill tone-amber">owner-first</span>
-        </div>
-        <div className="priority-grid">
-          <div className="priority-card">
-            <strong>Blocked</strong>
-            <span>{tasks.filter((task) => task.status === 'blocked').length}</span>
-            <p className="muted">Tasks that cannot move without intervention.</p>
-          </div>
-          <div className="priority-card">
-            <strong>Pending UX</strong>
-            <span>{tasks.filter((task) => task.requiresUxReview && !hasPassingReview(state, task.id, 'ux_review')).length}</span>
-            <p className="muted">UI work that still needs UX eyes before it is trustworthy.</p>
-          </div>
-          <div className="priority-card">
-            <strong>Missing Evidence</strong>
-            <span>{missingEvidenceCount}</span>
-            <p className="muted">Completed reviews without screenshot, snapshot, or evidence links.</p>
-          </div>
-          <div className="priority-card">
-            <strong>Next Action</strong>
-            <span>{boardDigest.nextAction ?? 'No urgent action'}</span>
-            <p className="muted">The clearest system-suggested next move right now.</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="composer card">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">Create task</p>
-            <h2>Minimum task intake contract</h2>
-          </div>
-          <span className="pill">local-first</span>
-        </div>
-
-        <form className="composer-grid" onSubmit={handleCreateTask}>
-          <label><span>Title</span><input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></label>
-          <label><span>Objective</span><input value={draft.objective} onChange={(e) => setDraft({ ...draft, objective: e.target.value })} /></label>
-          <label><span>Type</span><select value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value as TaskType })}><option value="code">code</option><option value="doc">doc</option><option value="research">research</option><option value="ops">ops</option><option value="bug">bug</option></select></label>
-          <label><span>Priority</span><select value={draft.priority} onChange={(e) => setDraft({ ...draft, priority: e.target.value as Priority })}><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="urgent">urgent</option></select></label>
-          <label><span>Initial status</span><select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as TaskStatus })}><option value="backlog">backlog</option><option value="triage">triage</option><option value="blocked">blocked</option></select></label>
-          <label className="checkbox-row"><input type="checkbox" checked={draft.needsUiTest} onChange={(e) => setDraft({ ...draft, needsUiTest: e.target.checked })} /><span>Needs UI test</span></label>
-          <label className="checkbox-row"><input type="checkbox" checked={draft.requiresApproval} onChange={(e) => setDraft({ ...draft, requiresApproval: e.target.checked })} /><span>Requires approval</span></label>
-          <label className="full-span"><span>Acceptance criteria (one per line)</span><textarea rows={4} value={draft.acceptanceCriteria} onChange={(e) => setDraft({ ...draft, acceptanceCriteria: e.target.value })} /></label>
-          <label className="full-span"><span>Boundaries (optional, one per line)</span><textarea rows={3} value={draft.boundaries} onChange={(e) => setDraft({ ...draft, boundaries: e.target.value })} /></label>
-          <div className="full-span actions-row"><button type="submit">Create task</button></div>
-        </form>
-      </section>
-
-      {selectedTask && (
-        <section className="detail-panel card">
-          <div className="panel-heading"><div><p className="eyebrow">Task Detail</p><h2>{selectedTask.title}</h2></div><div className="meta-row wrap"><span className={`pill ${statusTone[selectedTask.status]}`}>{formatStatus(selectedTask.status)}</span><span className="pill">spec: {selectedTask.specVersionSeen}</span><span className="pill">doc sync: {selectedTask.docSyncStatus}</span>{selectedTask.needsUiTest && <span className={`pill ${selectedTaskQaReady ? 'tone-green' : 'tone-amber'}`}>qa: {selectedTaskQaReady ? 'ready' : 'pending'}</span>}{selectedTask.requiresUxReview && <span className={`pill ${selectedTaskUxReady ? 'tone-green' : 'tone-amber'}`}>ux: {selectedTaskUxReady ? 'ready' : 'required'}</span>}</div></div>
-          <div className="transition-row">{transitionTargets[selectedTask.status].map((nextStatus) => (<button key={nextStatus} type="button" className="secondary" onClick={() => handleTransition(selectedTask.id, nextStatus)}>Move to {formatStatus(nextStatus)}</button>))}</div>
-          {selectedTask.needsUiTest && (
-            <div className="transition-row">
-              <button type="button" onClick={() => setState(requestUiTest(state, selectedTask.id))}>Start browser test</button>
-              <button type="button" className="secondary" onClick={() => setState(completeUiTest(state, selectedTask.id, true))}>Mark browser test passed</button>
-              <button type="button" className="secondary" onClick={() => setState(completeUiTest(state, selectedTask.id, false))}>Mark browser test failed</button>
-            </div>
-          )}
-          <div className="transition-row">
-            <button type="button" onClick={() => setState(requestReviewRun(state, selectedTask.id, 'qa_review'))}>Start QA review</button>
-            <button type="button" className="secondary" onClick={() => setState(requestReviewRun(state, selectedTask.id, 'ux_review'))}>Start UX review</button>
-          </div>
-          <div className="detail-grid">
-            <DetailSection title="Overview">
-              <div className="artifact-list">
-                <article className="artifact-item">
-                  <strong>Status</strong>
-                  <p>{formatStatus(selectedTask.status)}</p>
-                </article>
-                <article className="artifact-item">
-                  <strong>Next step</strong>
-                  <p>{selectedTask.nextStep ?? "Not set"}</p>
-                </article>
-                <article className="artifact-item">
-                  <strong>Needs Tony?</strong>
-                  <p>{selectedTask.requiresApproval ? "Yes — approval required" : selectedTask.blockerDetail ? "Maybe — see blocker" : "No immediate owner action"}</p>
-                </article>
-                <article className="artifact-item">
-                  <strong>Latest review evidence</strong>
-                  <p>{selectedTaskEvidence?.latestEvidenceLabel ?? "No evidence yet"}</p>
-                </article>
-              </div>
-            </DetailSection>
-            <DetailSection title="Decision / Edit">
-              <form className="detail-form" onSubmit={handleUpdateTask}>
-                <label><span>Title</span><input value={editDraft.title} onChange={(e) => setEditDraft({ ...editDraft, title: e.target.value })} /></label>
-                <label><span>Objective</span><textarea rows={3} value={editDraft.objective} onChange={(e) => setEditDraft({ ...editDraft, objective: e.target.value })} /></label>
-                <label><span>Acceptance Criteria</span><textarea rows={4} value={editDraft.acceptanceCriteria} onChange={(e) => setEditDraft({ ...editDraft, acceptanceCriteria: e.target.value })} /></label>
-                <label><span>Boundaries</span><textarea rows={3} value={editDraft.boundaries} onChange={(e) => setEditDraft({ ...editDraft, boundaries: e.target.value })} /></label>
-                <label><span>Next Step</span><input value={editDraft.nextStep} onChange={(e) => setEditDraft({ ...editDraft, nextStep: e.target.value })} /></label>
-                <label><span>Doc Sync</span><select value={editDraft.docSyncStatus} onChange={(e) => setEditDraft({ ...editDraft, docSyncStatus: e.target.value as DocSyncStatus })}><option value="in_sync">in_sync</option><option value="needs_update">needs_update</option><option value="deferred">deferred</option></select></label>
-                <label className="checkbox-row compact"><input type="checkbox" checked={editDraft.requiresSpecUpdate} onChange={(e) => setEditDraft({ ...editDraft, requiresSpecUpdate: e.target.checked })} /><span>Requires spec update</span></label>
-                <div className="actions-row"><button type="submit">Save task details</button></div>
-              </form>
-            </DetailSection>
-            <DetailSection title="Structured Progress">
-              <form className="detail-form" onSubmit={handleProgressSubmit}>
-                <label><span>Progress update</span><textarea rows={4} value={progressText} onChange={(e) => setProgressText(e.target.value)} placeholder="What changed?" /></label>
-                <label><span>Next step (optional)</span><input value={progressNextStep} onChange={(e) => setProgressNextStep(e.target.value)} /></label>
-                <div className="actions-row"><button type="submit">Add progress event</button></div>
-              </form>
-            </DetailSection>
-            <DetailSection title="Plan"><ol>{selectedTask.plan.map((step) => <li key={step.id} className="step-row"><div><span className={`step-state ${step.status}`}>{step.status}</span>{step.label}</div>{step.status !== 'done' && <button type="button" className="secondary small-button" onClick={() => handleCompleteStep(step.id)}>Complete</button>}</li>)}</ol></DetailSection>
-            <DetailSection title="Acceptance Criteria"><ul>{selectedTask.acceptanceCriteria.map((item) => <li key={item}>{item}</li>)}</ul></DetailSection>
-            <DetailSection title="Progress Log"><ul>{activity.filter((event) => event.taskId === selectedTask.id).map((event) => <li key={event.id}><strong>{event.title}</strong>{event.body ? ` — ${event.body}` : ''}</li>)}</ul></DetailSection>
-            <DetailSection title="Review Result Form">
-              <form className="detail-form">
-                <label><span>Target URL</span><input value={reviewDraft.targetUrl} onChange={(e) => setReviewDraft({ ...reviewDraft, targetUrl: e.target.value })} placeholder="http://127.0.0.1:4173/" /></label>
-                <label><span>Review summary</span><textarea rows={3} value={reviewDraft.summary} onChange={(e) => setReviewDraft({ ...reviewDraft, summary: e.target.value })} /></label>
-                <label><span>Findings</span><textarea rows={4} value={reviewDraft.findings} onChange={(e) => setReviewDraft({ ...reviewDraft, findings: e.target.value })} /></label>
-                <label><span>Screenshot path</span><input value={reviewDraft.screenshotPath} onChange={(e) => setReviewDraft({ ...reviewDraft, screenshotPath: e.target.value })} placeholder="/tmp/...png" /></label>
-                <label><span>Snapshot ID</span><input value={reviewDraft.snapshotId} onChange={(e) => setReviewDraft({ ...reviewDraft, snapshotId: e.target.value })} /></label>
-                <label><span>Evidence links (one per line)</span><textarea rows={3} value={reviewDraft.evidenceLinks} onChange={(e) => setReviewDraft({ ...reviewDraft, evidenceLinks: e.target.value })} /></label>
-                <div className="artifact-callout">
-                  <div className="meta-row wrap">
-                    <strong>Browser review command</strong>
-                    <button type="button" className="secondary small-button" onClick={() => copyText(`./mission-control/scripts/browser-review.sh ${reviewDraft.targetUrl || 'http://127.0.0.1:4173/'}`)}>Copy command</button>
+          <aside className="activity-card wide-card">
+            <h3 className="activity-title">ACTIVITY</h3>
+            <section className="now-running-box">
+              <div className="small-heading">NOW RUNNING</div>
+              {nowRunning ? (
+                <>
+                  <strong>{nowRunning.title}</strong>
+                  <p>{nowRunning.objective}</p>
+                  <p>Step {(nowRunning.currentStepIndex ?? 0) + 1}/{nowRunning.plan.length}</p>
+                  <p>Next: {nowRunning.nextStep ?? 'Next step pending…'}</p>
+                </>
+              ) : <p className="muted">Idle</p>}
+            </section>
+            <div className="stale-list">
+              {activity.slice(0, 5).map((event) => (
+                <div key={event.id} className="stale-item">
+                  <span className={`dot ${eventTone[event.type] ?? 'tone-slate'}`} />
+                  <div>
+                    <strong>{event.title}</strong>
+                    <p>{event.body ?? 'No details'}</p>
+                    <span className="muted small">{formatRelativeish(event.createdAt)}</span>
                   </div>
-                  <code>./mission-control/scripts/browser-review.sh {reviewDraft.targetUrl || 'http://127.0.0.1:4173/'}</code>
-                  <p className="muted">Run the harness, then paste the screenshot path, snapshot ID, and any evidence links back here.</p>
-                  <label>
-                    <span>Import harness JSON (optional)</span>
-                    <input type="file" accept="application/json" onChange={importReviewArtifactFromFile} />
-                  </label>
-                  {selectedTaskEvidence?.latestEvidenceLabel && (
-                    <p className="muted">Latest saved evidence: {selectedTaskEvidence.latestEvidenceLabel}</p>
-                  )}
-                  {selectedTaskEvidence?.latestEvidenceAt && (
-                    <p className="muted">Latest evidence captured at: {selectedTaskEvidence.latestEvidenceAt}</p>
-                  )}
-                  {selectedTaskEvidence?.missingEvidence && (
-                    <p className="missing-evidence">Latest completed review still has no screenshot, snapshot, or evidence link attached.</p>
-                  )}
-                  {selectedTask.requiresUxReview && !selectedTaskUxReady && (
-                    <p className="ux-review-reminder">UX review is still required for this task. Don’t stop at QA pass only.</p>
-                  )}
                 </div>
-                <div className="actions-row wrap">
-                  {runs.filter((run) => run.taskId === selectedTask.id && run.status === 'running' && (run.kind === 'qa_review' || run.kind === 'ux_review')).map((run) => (
-                    <div key={run.id} className="transition-row">
-                      <span className="pill">{run.kind} · {run.id}</span>
-                      {run.kind === 'qa_review' && <button type="button" onClick={() => submitReview(run.id, 'pass')}>Submit QA pass</button>}
-                      {run.kind === 'qa_review' && <button type="button" className="secondary" onClick={() => submitReview(run.id, 'fail')}>Submit QA fail</button>}
-                      {run.kind === 'ux_review' && <button type="button" onClick={() => submitReview(run.id, 'submit')}>Submit UX review</button>}
+              ))}
+            </div>
+          </aside>
+        </section>
+
+        <section className="lower-grid">
+          <section className="card-shell attention-panel">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">Needs Attention</p>
+                <h2>What needs action now</h2>
+              </div>
+            </div>
+            <div className="attention-list">
+              <div className="attention-row"><strong>Blocked</strong><span>{tasks.filter((task) => task.status === 'blocked').length}</span></div>
+              <div className="attention-row"><strong>Pending UX</strong><span>{tasks.filter((task) => task.requiresUxReview && !hasPassingReview(state, task.id, 'ux_review')).length}</span></div>
+              <div className="attention-row"><strong>Missing Evidence</strong><span>{missingEvidenceCount}</span></div>
+              <div className="attention-row next-action"><strong>Next Action</strong><span>{boardDigest.nextAction ?? 'No urgent action'}</span></div>
+            </div>
+          </section>
+
+          <section className="card-shell details-panel">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">Task Detail</p>
+                <h2>{selectedTask?.title}</h2>
+              </div>
+              <div className="chips-row">
+                {selectedTask && <span className={`pill ${statusTone[selectedTask.status]}`}>{formatStatus(selectedTask.status)}</span>}
+                {selectedTask?.requiresUxReview && <span className={`pill ${selectedTaskUxReady ? 'tone-green' : 'tone-amber'}`}>ux {selectedTaskUxReady ? 'ready' : 'required'}</span>}
+              </div>
+            </div>
+
+            {selectedTask && (
+              <div className="detail-stack">
+                <div className="overview-grid">
+                  <InfoCard title="Status" value={formatStatus(selectedTask.status)} />
+                  <InfoCard title="Next step" value={selectedTask.nextStep ?? 'Not set'} />
+                  <InfoCard title="Needs Tony?" value={selectedTask.requiresApproval ? 'Approval required' : selectedTask.blockerDetail ? 'Check blocker' : 'No'} />
+                  <InfoCard title="Latest evidence" value={selectedTaskEvidence?.latestEvidenceLabel ?? 'No evidence yet'} />
+                </div>
+
+                <div className="read-sections">
+                  <DetailSection title="Objective"><p>{selectedTask.objective}</p></DetailSection>
+                  <DetailSection title="Acceptance Criteria"><ul>{selectedTask.acceptanceCriteria.map((item) => <li key={item}>{item}</li>)}</ul></DetailSection>
+                  <DetailSection title="Review Artifacts">
+                    {latestReviewRuns.length ? latestReviewRuns.slice(0, 2).map((run) => (
+                      <article key={run.id} className="artifact-item">
+                        <div className="meta-row wrap"><strong>{run.kind}</strong><span className="pill">{run.status}</span></div>
+                        <p>{run.artifact?.reviewSummary || run.summary || 'No summary yet.'}</p>
+                        {run.artifact?.snapshotId && <p className="muted">Snapshot: {run.artifact.snapshotId}</p>}
+                        {run.artifact?.screenshotPath && <p className="muted">Screenshot: {run.artifact.screenshotPath}</p>}
+                      </article>
+                    )) : <p className="muted">No review artifacts saved yet.</p>}
+                  </DetailSection>
+                  <DetailSection title="Notification Preview">
+                    {selectedTaskDigest ? <ul>{selectedTaskDigest.lines.map((line) => <li key={line}>{line}</li>)}</ul> : <p className="muted">No digest yet.</p>}
+                  </DetailSection>
+                </div>
+
+                <details className="admin-tools">
+                  <summary>System / Admin tools</summary>
+                  <section className="tooling-stack">
+                    <div className="transition-row wrap">
+                      {transitionTargets[selectedTask.status].map((nextStatus) => (<button key={nextStatus} type="button" className="secondary" onClick={() => handleTransition(selectedTask.id, nextStatus)}>Move to {formatStatus(nextStatus)}</button>))}
                     </div>
-                  ))}
-                  <button type="button" className="secondary" onClick={() => setState(createFollowupTask(state, selectedTask.id, 'improvement', `Improve: ${selectedTask.title}`, reviewDraft.summary || 'UX improvement requested from review.'))}>Create improvement task</button>
-                  <button type="button" className="secondary" onClick={() => setState(createFollowupTask(state, selectedTask.id, 'spec_update', `Spec update: ${selectedTask.title}`, reviewDraft.summary || 'Spec update requested from review.'))}>Create spec-update task</button>
-                </div>
-              </form>
-            </DetailSection>
-            <DetailSection title="Notification Preview">
-              {selectedTaskDigest ? (
-                <div className="artifact-list">
-                  <article className="artifact-item">
-                    <div className="meta-row wrap">
-                      <strong>{selectedTaskDigest.headline}</strong>
-                      <button type="button" className="secondary small-button" onClick={() => copyText(formatDigestForCopy(selectedTaskDigest.headline, selectedTaskDigest.lines, selectedTaskDigest.nextAction))}>Copy task digest</button>
+                    <div className="transition-row wrap">
+                      {selectedTask.needsUiTest && <button type="button" onClick={() => setState(requestUiTest(state, selectedTask.id))}>Start browser test</button>}
+                      {selectedTask.needsUiTest && <button type="button" className="secondary" onClick={() => setState(completeUiTest(state, selectedTask.id, true))}>Mark browser test passed</button>}
+                      {selectedTask.needsUiTest && <button type="button" className="secondary" onClick={() => setState(completeUiTest(state, selectedTask.id, false))}>Mark browser test failed</button>}
+                      <button type="button" onClick={() => setState(requestReviewRun(state, selectedTask.id, 'qa_review'))}>Start QA review</button>
+                      <button type="button" className="secondary" onClick={() => setState(requestReviewRun(state, selectedTask.id, 'ux_review'))}>Start UX review</button>
                     </div>
-                    <ul>
-                      {selectedTaskDigest.lines.map((line) => <li key={line}>{line}</li>)}
-                      {selectedTaskDigest.nextAction && <li><strong>next action:</strong> {selectedTaskDigest.nextAction}</li>}
-                    </ul>
-                  </article>
-                </div>
-              ) : <p className="muted">No notification preview available.</p>}
-            </DetailSection>
-            <DetailSection title="Review Artifacts">
-              {latestReviewRuns.length ? (
-                <div className="artifact-list">
-                  {latestReviewRuns.map((run) => (
-                    <article key={run.id} className="artifact-item">
-                      <div className="meta-row wrap">
-                        <strong>{run.kind}</strong>
-                        <span className="pill">{run.status}</span>
-                        <span className="pill">{run.id}</span>
+
+                    <form className="detail-form" onSubmit={handleUpdateTask}>
+                      <label><span>Title</span><input value={editDraft.title} onChange={(e) => setEditDraft({ ...editDraft, title: e.target.value })} /></label>
+                      <label><span>Objective</span><textarea rows={3} value={editDraft.objective} onChange={(e) => setEditDraft({ ...editDraft, objective: e.target.value })} /></label>
+                      <label><span>Acceptance Criteria</span><textarea rows={4} value={editDraft.acceptanceCriteria} onChange={(e) => setEditDraft({ ...editDraft, acceptanceCriteria: e.target.value })} /></label>
+                      <label><span>Boundaries</span><textarea rows={3} value={editDraft.boundaries} onChange={(e) => setEditDraft({ ...editDraft, boundaries: e.target.value })} /></label>
+                      <label><span>Next Step</span><input value={editDraft.nextStep} onChange={(e) => setEditDraft({ ...editDraft, nextStep: e.target.value })} /></label>
+                      <div className="actions-row"><button type="submit">Save task details</button></div>
+                    </form>
+
+                    <form className="detail-form" onSubmit={(e) => { handleProgressSubmit(e) }}>
+                      <label><span>Progress update</span><textarea rows={3} value={progressText} onChange={(e) => setProgressText(e.target.value)} /></label>
+                      <label><span>Next step</span><input value={progressNextStep} onChange={(e) => setProgressNextStep(e.target.value)} /></label>
+                      <div className="actions-row"><button type="submit">Add progress</button></div>
+                    </form>
+
+                    <form className="detail-form">
+                      <label><span>Target URL</span><input value={reviewDraft.targetUrl} onChange={(e) => setReviewDraft({ ...reviewDraft, targetUrl: e.target.value })} /></label>
+                      <label><span>Review summary</span><textarea rows={3} value={reviewDraft.summary} onChange={(e) => setReviewDraft({ ...reviewDraft, summary: e.target.value })} /></label>
+                      <label><span>Findings</span><textarea rows={3} value={reviewDraft.findings} onChange={(e) => setReviewDraft({ ...reviewDraft, findings: e.target.value })} /></label>
+                      <label><span>Screenshot path</span><input value={reviewDraft.screenshotPath} onChange={(e) => setReviewDraft({ ...reviewDraft, screenshotPath: e.target.value })} /></label>
+                      <label><span>Snapshot ID</span><input value={reviewDraft.snapshotId} onChange={(e) => setReviewDraft({ ...reviewDraft, snapshotId: e.target.value })} /></label>
+                      <label><span>Evidence links</span><textarea rows={2} value={reviewDraft.evidenceLinks} onChange={(e) => setReviewDraft({ ...reviewDraft, evidenceLinks: e.target.value })} /></label>
+                      <label><span>Import harness JSON</span><input type="file" accept="application/json" onChange={importReviewArtifactFromFile} /></label>
+                      <div className="actions-row wrap">
+                        {runs.filter((run) => run.taskId === selectedTask.id && run.status === 'running' && (run.kind === 'qa_review' || run.kind === 'ux_review')).map((run) => (
+                          <div key={run.id} className="transition-row">
+                            {run.kind === 'qa_review' && <button type="button" onClick={() => submitReview(run.id, 'pass')}>Submit QA pass</button>}
+                            {run.kind === 'qa_review' && <button type="button" className="secondary" onClick={() => submitReview(run.id, 'fail')}>Submit QA fail</button>}
+                            {run.kind === 'ux_review' && <button type="button" onClick={() => submitReview(run.id, 'submit')}>Submit UX review</button>}
+                          </div>
+                        ))}
+                        <button type="button" className="secondary" onClick={() => setState(createFollowupTask(state, selectedTask.id, 'improvement', `Improve: ${selectedTask.title}`, reviewDraft.summary || 'UX improvement requested from review.'))}>Create improvement task</button>
+                        <button type="button" className="secondary" onClick={() => setState(createFollowupTask(state, selectedTask.id, 'spec_update', `Spec update: ${selectedTask.title}`, reviewDraft.summary || 'Spec update requested from review.'))}>Create spec-update task</button>
                       </div>
-                      <p>{run.artifact?.reviewSummary || run.summary || 'No review summary yet.'}</p>
-                      {run.artifact?.targetUrl && <p className="muted">Target: {run.artifact.targetUrl}</p>}
-                      {run.artifact?.capturedAt && <p className="muted">Captured: {run.artifact.capturedAt}</p>}
-                      {run.artifact?.snapshotId && <p className="muted">Snapshot: {run.artifact.snapshotId}</p>}
-                      {run.artifact?.screenshotPath && <p className="muted">Screenshot: {run.artifact.screenshotPath}</p>}
-                      {run.artifact?.findings && <p className="muted">Findings: {run.artifact.findings}</p>}
-                      {!run.artifact?.screenshotPath && !run.artifact?.snapshotId && !(run.artifact?.evidenceLinks?.length) ? (
-                        <p className="missing-evidence">Missing evidence: no screenshot, snapshot, or evidence links were attached to this review run yet.</p>
-                      ) : null}
-                      {run.artifact?.evidenceLinks?.length ? (
-                        <ul>
-                          {run.artifact.evidenceLinks.map((link) => (
-                            <li key={link}><a href={link} target="_blank" rel="noreferrer">{link}</a></li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <p className="muted">No QA/UX review artifacts saved yet.</p>
-              )}
-            </DetailSection>
-            <DetailSection title="Result">{selectedTask.status === 'done' ? <p>Completed successfully and surfaced in Done Digest.</p> : selectedTask.status === 'blocked' ? <p>{selectedTask.blockerDetail ?? 'Task is blocked.'}</p> : <p className="muted">Result pending completion.</p>}
-              {selectedTask.reviewSummary && <p className="muted">Latest review: {selectedTask.reviewSummary}</p>}
-              {selectedTask.evidenceLinks?.length ? <ul>{selectedTask.evidenceLinks.map((link) => <li key={link}><a href={link} target="_blank" rel="noreferrer">{link}</a></li>)}</ul> : null}
-            </DetailSection>
+                    </form>
+                  </section>
+                </details>
+              </div>
+            )}
+          </section>
+        </section>
+
+        <section className="card-shell bottom-tools">
+          <div className="panel-heading"><div><p className="eyebrow">System / Admin</p><h2>Export, runner, and debug tooling</h2></div></div>
+          <div className="tool-grid">
+            <section className="tool-card">
+              <h3>State Export</h3>
+              <p className="muted">Bridge current board state to shell tools.</p>
+              <button type="button" onClick={handleExportState}>Export state JSON</button>
+              <p className="muted small">Target path: {EXPORT_FILE_PATH}</p>
+            </section>
+            <section className="tool-card">
+              <h3>Runner Prototype</h3>
+              <p className="muted">Auto-pick and run tracking.</p>
+              <button type="button" onClick={() => setState(autoPickNextTask(state))}>Auto-pick next triage task</button>
+              <div className="digest-list compact-list">
+                {runs.slice(0, 4).map((run) => <div key={run.id} className="digest-item"><strong>{run.id}</strong><span>{run.kind} · {run.status}</span></div>)}
+              </div>
+            </section>
+            <section className="tool-card">
+              <h3>Quick Create</h3>
+              <form className="detail-form" onSubmit={handleCreateTask}>
+                <input placeholder="Title" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+                <input placeholder="Objective" value={draft.objective} onChange={(e) => setDraft({ ...draft, objective: e.target.value })} />
+                <textarea rows={2} placeholder="Acceptance criteria" value={draft.acceptanceCriteria} onChange={(e) => setDraft({ ...draft, acceptanceCriteria: e.target.value })} />
+                <button type="submit">Create task</button>
+              </form>
+            </section>
           </div>
         </section>
-      )}
+      </main>
     </div>
   )
 }
@@ -601,8 +534,12 @@ function createEditDraft(task?: Task) {
   }
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return <div className="stat-card"><span>{label}</span><strong>{value}</strong></div>
+function StatBig({ label, value, accent }: { label: string; value: string; accent: string }) {
+  return <div className={`stat-big ${accent}`}><strong>{value}</strong><span>{label}</span></div>
+}
+
+function InfoCard({ title, value }: { title: string; value: string }) {
+  return <article className="artifact-item"><strong>{title}</strong><p>{value}</p></article>
 }
 
 function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
