@@ -18,6 +18,7 @@ Advance Mission Control from a local board prototype into an autonomous review/d
 - notification digest helpers + UI preview for push-friendly summaries
 - copy-ready board/task digest actions for push-message handoff
 - digest output now includes missing-evidence counts and example incomplete review runs
+- sample + fallback digest paths now both exercise the same evidence-missing UX review scenario
 - browser review harness script that saves reusable JSON artifacts
 
 ## Next priorities
