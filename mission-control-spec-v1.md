@@ -549,10 +549,11 @@ Mission Control v1 is successful when all of the following are true:
 - define event model
 
 ### Phase B — Local single-user engine
-- in-memory or file/db-backed tasks
+- browser-local task store (localStorage for MVP)
 - board UI
-- state transitions
-- activity feed
+- validated state transitions
+- activity feed derived from task creation and transitions
+- minimum task creation form
 
 ### Phase C — Runner backbone
 - triage polling

@@ -6,9 +6,13 @@ Initial source of truth:
 - ../mission-control-spec-v1.md
 
 Current state:
-- Phase B skeleton is in place
+- Phase B local-first MVP is in place
 - React + Vite app scaffolded
-- board UI, activity feed, task detail panel, and doc-sync fields are visible with sample data
+- board UI, activity feed, task detail panel, and doc-sync fields are visible
+- local task store persists to browser localStorage
+- task creation form is wired
+- state transitions are validated against the canonical state machine
+- activity entries are generated from task creation and transitions
 
 Planned focus:
 - Kanban task board
