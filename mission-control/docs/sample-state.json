@@ -30,7 +30,26 @@
     {
       "taskId": "MC-4",
       "title": "Notification pipeline blocked"
+    },
+    {
+      "taskId": "MC-1",
+      "title": "MC-1 UX review submitted"
     }
   ],
-  "runs": []
+  "runs": [
+    {
+      "id": "RUN-UX-1",
+      "taskId": "MC-1",
+      "kind": "ux_review",
+      "status": "passed",
+      "startedAt": "2026-03-16T07:00:00.000Z",
+      "endedAt": "2026-03-16T07:05:00.000Z",
+      "heartbeatAt": "2026-03-16T07:05:00.000Z",
+      "summary": "UX review submitted with notes but no captured evidence yet.",
+      "artifact": {
+        "reviewSummary": "Navigation labels still feel rough; refine after next pass.",
+        "capturedAt": "2026-03-16T07:05:00.000Z"
+      }
+    }
+  ]
 }
