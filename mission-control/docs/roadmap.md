@@ -15,6 +15,7 @@ Advance Mission Control from a local board prototype into an autonomous review/d
 - review artifact fields for summary, findings, screenshot path, snapshot id, evidence links, and target URL
 - task detail surface for review artifact history
 - notification digest helpers + UI preview for push-friendly summaries
+- copy-ready board/task digest actions for push-message handoff
 - browser review harness script that saves reusable JSON artifacts
 
 ## Next priorities

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
+import { addProgressEvent, autoPickNextTask, completeReviewRun, completeStep, completeUiTest, createFollowupTask, createTask, getBoardNotificationDigest, getTaskNotificationDigest, hasPassingReview, heartbeatRun, loadState, markRunStale, requestReviewRun, requestUiTest, transitionTask, updateTask } from './store'
 
 const EXPORT_FILE_PATH = '/tmp/mission-control/state.json'
-import { addProgressEvent, autoPickNextTask, completeReviewRun, completeStep, completeUiTest, createFollowupTask, createTask, getBoardNotificationDigest, getTaskNotificationDigest, hasPassingReview, heartbeatRun, loadState, markRunStale, requestReviewRun, requestUiTest, transitionTask, updateTask } from './store'
 import type { ActivityEvent, DocSyncStatus, Priority, Task, TaskStatus, TaskType } from './types'
 
 const columns: Array<{ key: TaskStatus; label: string }> = [
@@ -210,6 +210,18 @@ export function App() {
     URL.revokeObjectURL(url)
   }
 
+  async function copyText(text: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to copy text')
+    }
+  }
+
+  function formatDigestForCopy(headline: string, lines: string[]) {
+    return [`**${headline}**`, ...lines.map((line) => `- ${line}`)].join('\n')
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -232,7 +244,10 @@ export function App() {
             <p className="eyebrow">State Export</p>
             <h2>Bridge current board state to shell tools</h2>
           </div>
-          <button type="button" onClick={handleExportState}>Export state JSON</button>
+          <div className="transition-row compact-actions">
+            <button type="button" onClick={handleExportState}>Export state JSON</button>
+            <button type="button" className="secondary" onClick={() => copyText(formatDigestForCopy(boardDigest.headline, boardDigest.lines))}>Copy board digest</button>
+          </div>
         </div>
         <p className="muted">Downloads a JSON snapshot that shell helpers can read now. Target file path for the bridge plan: {EXPORT_FILE_PATH}</p>
       </section>
@@ -400,7 +415,10 @@ export function App() {
               {selectedTaskDigest ? (
                 <div className="artifact-list">
                   <article className="artifact-item">
-                    <strong>{selectedTaskDigest.headline}</strong>
+                    <div className="meta-row wrap">
+                      <strong>{selectedTaskDigest.headline}</strong>
+                      <button type="button" className="secondary small-button" onClick={() => copyText(formatDigestForCopy(selectedTaskDigest.headline, selectedTaskDigest.lines))}>Copy task digest</button>
+                    </div>
                     <ul>
                       {selectedTaskDigest.lines.map((line) => <li key={line}>{line}</li>)}
                     </ul>

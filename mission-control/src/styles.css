@@ -296,6 +296,9 @@ button.secondary {
 
 .wrap { flex-wrap: wrap; }
 
+.compact-actions {
+  margin-top: 0;
+}
 
 .detail-form {
   display: flex;
