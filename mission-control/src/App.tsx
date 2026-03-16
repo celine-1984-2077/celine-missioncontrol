@@ -88,7 +88,7 @@ export function App() {
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? tasks[0]
 
   const stats = {
-    week: 48,
+    week: 0,
     inProgress: tasks.filter((t) => t.status === 'in_progress').length,
     total: tasks.length,
     completion: `${Math.round((tasks.filter((t) => t.status === 'done').length / Math.max(1, tasks.length)) * 100)}%`,
