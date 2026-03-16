@@ -19,6 +19,11 @@ export interface MissionControlState {
   runs: Run[]
 }
 
+export interface NotificationDigest {
+  headline: string
+  lines: string[]
+}
+
 export interface TaskDraft {
   title: string
   objective: string
@@ -128,6 +133,7 @@ export function createTask(state: MissionControlState, draft: TaskDraft): Missio
     source: 'board',
     assignee: 'celine',
     needsUiTest: draft.needsUiTest,
+    requiresUxReview: draft.needsUiTest,
     plan: [
       { id: `${nextId}-1`, label: 'Clarify and structure the task', status: 'pending' },
       { id: `${nextId}-2`, label: 'Execute implementation', status: 'pending' },
@@ -488,6 +494,7 @@ export function completeUiTest(state: MissionControlState, taskId: string, passe
     source: 'bug_loop',
     assignee: 'celine',
     needsUiTest: true,
+    requiresUxReview: task.requiresUxReview,
     parentTaskId: task.id,
     plan: [
       { id: `${bugId}-1`, label: 'Reproduce browser failure', status: 'pending' },
@@ -636,6 +643,7 @@ export function completeReviewRun(
       source: 'bug_loop',
       assignee: 'celine',
       needsUiTest: task.needsUiTest,
+      requiresUxReview: task.requiresUxReview,
       parentTaskId: task.id,
       plan: [
         { id: `${bugId}-1`, label: 'Review QA findings', status: 'pending' },
@@ -740,6 +748,7 @@ export function createFollowupTask(
     source: 'system',
     assignee: 'celine',
     needsUiTest: false,
+    requiresUxReview: false,
     parentTaskId: task.id,
     plan: [
       { id: `${nextId}-1`, label: 'Review finding', status: 'pending' },
@@ -764,6 +773,51 @@ export function createFollowupTask(
     createdBy: 'system',
   }
   return commit({ ...state, tasks: [newTask, ...state.tasks], activity: [event, ...state.activity] })
+}
+
+export function hasPassingReview(state: MissionControlState, taskId: string, kind: 'qa_review' | 'ux_review') {
+  return state.runs.some((run) => run.taskId === taskId && run.kind === kind && run.status === 'passed')
+}
+
+export function getTaskNotificationDigest(state: MissionControlState, taskId: string): NotificationDigest | undefined {
+  const task = state.tasks.find((item) => item.id === taskId)
+  if (!task) return undefined
+
+  const lines = [
+    `${task.id} · ${task.title}`,
+    `status=${task.status} priority=${task.priority} type=${task.type}`,
+  ]
+
+  if (task.nextStep) lines.push(`next: ${task.nextStep}`)
+  if (task.blockerDetail) lines.push(`blocker: ${task.blockerDetail}`)
+  if (task.reviewSummary) lines.push(`review: ${task.reviewSummary}`)
+
+  const qaReady = hasPassingReview(state, task.id, 'qa_review')
+  const uxReady = !task.requiresUxReview || hasPassingReview(state, task.id, 'ux_review')
+  const uiReady = !task.needsUiTest || state.runs.some((run) => run.taskId === task.id && run.kind === 'ui_test' && run.status === 'passed') || task.status === 'done'
+  lines.push(`gates: ui=${uiReady ? 'ok' : 'pending'} qa=${qaReady ? 'ok' : 'pending'} ux=${uxReady ? 'ok' : 'pending'}`)
+
+  return {
+    headline: task.status === 'blocked' ? 'Mission Control blocker' : task.status === 'done' ? 'Mission Control completed task' : 'Mission Control update',
+    lines,
+  }
+}
+
+export function getBoardNotificationDigest(state: MissionControlState): NotificationDigest {
+  const blocked = state.tasks.filter((task) => task.status === 'blocked')
+  const inProgress = state.tasks.filter((task) => task.status === 'in_progress')
+  const pendingUx = state.tasks.filter((task) => task.requiresUxReview && !hasPassingReview(state, task.id, 'ux_review'))
+  const latestEvents = state.activity.slice(0, 3).map((event) => `${event.taskId}: ${event.title}`)
+
+  return {
+    headline: 'Mission Control overnight digest',
+    lines: [
+      `in_progress=${inProgress.length} blocked=${blocked.length} pending_ux=${pendingUx.length}`,
+      ...(blocked.slice(0, 2).map((task) => `blocked: ${task.id} ${task.blockerDetail ?? task.title}`)),
+      ...(inProgress.slice(0, 2).map((task) => `active: ${task.id} next=${task.nextStep ?? 'unset'}`)),
+      ...latestEvents,
+    ],
+  }
 }
 
 function finalizeRun(runs: Run[], runId: string, status: 'passed' | 'failed', now: string) {

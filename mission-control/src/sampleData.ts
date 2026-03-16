@@ -20,6 +20,7 @@ export const tasks: Task[] = [
     source: 'chat',
     assignee: 'celine',
     needsUiTest: true,
+    requiresUxReview: true,
     tags: ['mvp', 'ui'],
     plan: [
       { id: 's1', label: 'Define data model slices for MVP', status: 'done' },
@@ -52,6 +53,7 @@ export const tasks: Task[] = [
     source: 'system',
     assignee: 'celine',
     needsUiTest: false,
+    requiresUxReview: false,
     plan: [
       { id: 's1', label: 'Choose local storage model', status: 'pending' },
       { id: 's2', label: 'Build transition helpers', status: 'pending' },

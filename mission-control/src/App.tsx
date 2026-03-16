@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { addProgressEvent, autoPickNextTask, completeReviewRun, completeStep, completeUiTest, createFollowupTask, createTask, heartbeatRun, loadState, markRunStale, requestReviewRun, requestUiTest, transitionTask, updateTask } from './store'
+import { addProgressEvent, autoPickNextTask, completeReviewRun, completeStep, completeUiTest, createFollowupTask, createTask, getBoardNotificationDigest, getTaskNotificationDigest, hasPassingReview, heartbeatRun, loadState, markRunStale, requestReviewRun, requestUiTest, transitionTask, updateTask } from './store'
 import type { ActivityEvent, DocSyncStatus, Priority, Task, TaskStatus, TaskType } from './types'
 
 const columns: Array<{ key: TaskStatus; label: string }> = [
@@ -83,6 +83,10 @@ export function App() {
     const bTime = b.endedAt ?? b.startedAt ?? ''
     return bTime.localeCompare(aTime)
   })
+  const boardDigest = getBoardNotificationDigest(state)
+  const selectedTaskDigest = selectedTask ? getTaskNotificationDigest(state, selectedTask.id) : undefined
+  const selectedTaskQaReady = selectedTask ? hasPassingReview(state, selectedTask.id, 'qa_review') : false
+  const selectedTaskUxReady = selectedTask ? (!selectedTask.requiresUxReview || hasPassingReview(state, selectedTask.id, 'ux_review')) : false
 
   const [editDraft, setEditDraft] = useState(() => createEditDraft(selectedTask))
 
@@ -195,6 +199,7 @@ export function App() {
           <Stat label="Tasks" value={String(tasks.length)} />
           <Stat label="In Progress" value={String(tasks.filter((t) => t.status === 'in_progress').length)} />
           <Stat label="Needs Doc Sync" value={String(tasks.filter((t) => t.docSyncStatus === 'needs_update').length)} />
+          <Stat label="Pending UX" value={String(tasks.filter((t) => t.requiresUxReview && !hasPassingReview(state, t.id, 'ux_review')).length)} />
         </div>
       </header>
 
@@ -270,7 +275,7 @@ export function App() {
                       <div className="task-card-header"><span className={`pill ${statusTone[task.status]}`}>{formatStatus(task.status)}</span><span className="task-id">{task.id}</span></div>
                       <h4>{task.title}</h4>
                       <p>{task.objective}</p>
-                      <div className="meta-row"><span>{task.type}</span><span>{task.priority}</span>{task.needsUiTest && <span>ui test</span>}</div>
+                      <div className="meta-row"><span>{task.type}</span><span>{task.priority}</span>{task.needsUiTest && <span>ui test</span>}{task.requiresUxReview && <span>ux review</span>}</div>
                       <div className="meta-row"><span className={`pill ${task.docSyncStatus === 'needs_update' ? 'tone-red' : task.docSyncStatus === 'deferred' ? 'tone-slate' : 'tone-green'}`}>doc: {task.docSyncStatus ?? 'n/a'}</span>{task.requiresApproval && <span className="pill tone-red">approval</span>}</div>
                     </article>
                   ))}
@@ -288,12 +293,13 @@ export function App() {
           </section>
           <section className="subpanel"><div className="subpanel-header"><h3>Recent Updates</h3></div><div className="timeline">{activity.slice(0, 10).map((event) => (<div key={event.id} className="timeline-item"><div className={`timeline-dot ${eventTone[event.type] ?? 'tone-slate'}`} /><div><div className="timeline-title-row"><strong>{event.title}</strong><span className="task-id">{event.taskId}</span></div>{event.body && <p>{event.body}</p>}<span className="muted small">{event.createdAt}</span></div></div>))}</div></section>
           <section className="subpanel"><div className="subpanel-header"><h3>Done Digest</h3></div><div className="digest-list">{doneDigest.map((task) => (<div key={task.id} className="digest-item"><strong>{task.id}</strong><span>{task.title}</span></div>))}</div></section>
+          <section className="subpanel"><div className="subpanel-header"><h3>Push Digest Preview</h3></div><div className="digest-list">{boardDigest.lines.map((line) => (<div key={line} className="digest-item"><span>{line}</span></div>))}</div></section>
         </aside>
       </main>
 
       {selectedTask && (
         <section className="detail-panel card">
-          <div className="panel-heading"><div><p className="eyebrow">Task Detail</p><h2>{selectedTask.title}</h2></div><div className="meta-row wrap"><span className={`pill ${statusTone[selectedTask.status]}`}>{formatStatus(selectedTask.status)}</span><span className="pill">spec: {selectedTask.specVersionSeen}</span><span className="pill">doc sync: {selectedTask.docSyncStatus}</span></div></div>
+          <div className="panel-heading"><div><p className="eyebrow">Task Detail</p><h2>{selectedTask.title}</h2></div><div className="meta-row wrap"><span className={`pill ${statusTone[selectedTask.status]}`}>{formatStatus(selectedTask.status)}</span><span className="pill">spec: {selectedTask.specVersionSeen}</span><span className="pill">doc sync: {selectedTask.docSyncStatus}</span>{selectedTask.needsUiTest && <span className={`pill ${selectedTaskQaReady ? 'tone-green' : 'tone-amber'}`}>qa: {selectedTaskQaReady ? 'ready' : 'pending'}</span>}{selectedTask.requiresUxReview && <span className={`pill ${selectedTaskUxReady ? 'tone-green' : 'tone-amber'}`}>ux: {selectedTaskUxReady ? 'ready' : 'required'}</span>}</div></div>
           <div className="transition-row">{transitionTargets[selectedTask.status].map((nextStatus) => (<button key={nextStatus} type="button" className="secondary" onClick={() => handleTransition(selectedTask.id, nextStatus)}>Move to {formatStatus(nextStatus)}</button>))}</div>
           {selectedTask.needsUiTest && (
             <div className="transition-row">
@@ -355,6 +361,18 @@ export function App() {
                   <button type="button" className="secondary" onClick={() => setState(createFollowupTask(state, selectedTask.id, 'spec_update', `Spec update: ${selectedTask.title}`, reviewDraft.summary || 'Spec update requested from review.'))}>Create spec-update task</button>
                 </div>
               </form>
+            </DetailSection>
+            <DetailSection title="Notification Preview">
+              {selectedTaskDigest ? (
+                <div className="artifact-list">
+                  <article className="artifact-item">
+                    <strong>{selectedTaskDigest.headline}</strong>
+                    <ul>
+                      {selectedTaskDigest.lines.map((line) => <li key={line}>{line}</li>)}
+                    </ul>
+                  </article>
+                </div>
+              ) : <p className="muted">No notification preview available.</p>}
             </DetailSection>
             <DetailSection title="Review Artifacts">
               {latestReviewRuns.length ? (

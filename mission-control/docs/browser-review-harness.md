@@ -49,7 +49,12 @@ Recommended review loop:
 1. run the harness against the local app
 2. paste screenshot path, snapshot id, target URL, and any evidence links into the Mission Control review form
 3. submit QA or UX review result
-4. create follow-up improvement/spec-update tasks when findings require it
+4. verify the task-level notification preview reflects updated review gates
+5. create follow-up improvement/spec-update tasks when findings require it
+
+UX review expectation:
+- UI tasks should carry a UX review requirement until a UX review passes
+- push/digest output should make pending UX review visible so unfinished polish is not hidden
 
 ## What the harness should support next
 

@@ -68,6 +68,7 @@ export interface Task {
   source: 'board' | 'chat' | 'system' | 'bug_loop'
   assignee: 'celine'
   needsUiTest: boolean
+  requiresUxReview?: boolean
   parentTaskId?: string
   relatedDocIds?: string[]
   tags?: string[]

@@ -24,6 +24,8 @@ Current state:
 - QA review failure can auto-create follow-up bug tasks
 - review result forms can store summary, findings, screenshot path, snapshot id, target URL, and evidence links
 - review artifacts are visible from the task detail panel as a lightweight evidence history
+- UI tasks visibly carry a UX review requirement until a UX review passes
+- notification digest previews can render push-friendly task/board summaries
 - review findings can promote improvement/spec-update follow-up tasks
 - initial local browser-review harness is documented under `docs/browser-review-harness.md`
 - roadmap/status is tracked in `docs/roadmap.md`
