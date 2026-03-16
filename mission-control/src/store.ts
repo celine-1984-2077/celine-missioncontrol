@@ -86,13 +86,18 @@ export function transitionTask(state: MissionControlState, taskId: string, nextS
     lastEventAt: now,
     completedAt: nextStatus === 'done' ? now : task.completedAt,
     currentStepIndex: nextStatus === 'in_progress' && typeof task.currentStepIndex !== 'number' ? 0 : task.currentStepIndex,
+    activeRunId: nextStatus === 'done' ? undefined : task.activeRunId,
   }
+
+  const nextRuns = task.activeRunId && (nextStatus === 'done' || nextStatus === 'blocked')
+    ? finalizeRun(state.runs, task.activeRunId, nextStatus === 'done' ? 'passed' : 'failed', now)
+    : state.runs
 
   const event = buildTransitionEvent(task, nextStatus, now)
   return commit({
     tasks: state.tasks.map((item) => (item.id === taskId ? updatedTask : item)),
     activity: [event, ...state.activity],
-    runs: state.runs,
+    runs: nextRuns,
   })
 }
 
@@ -344,6 +349,7 @@ export function markRunStale(state: MissionControlState, runId: string): Mission
     ? {
         ...task,
         status: 'blocked' as const,
+        activeRunId: undefined,
         blockerDetail: 'Run heartbeat went stale in local prototype.',
         updatedAt: now,
         lastEventAt: now,
@@ -367,6 +373,184 @@ export function markRunStale(state: MissionControlState, runId: string): Mission
     activity: [event, ...state.activity],
     runs: state.runs.map((item) => (item.id === runId ? updatedRun : item)),
   })
+}
+
+export function requestUiTest(state: MissionControlState, taskId: string): MissionControlState {
+  const task = state.tasks.find((item) => item.id === taskId)
+  if (!task || !task.needsUiTest) return state
+  const now = new Date().toISOString()
+  const runId = `RUN-${state.runs.length + 1}`
+
+  const uiRun: Run = {
+    id: runId,
+    taskId,
+    kind: 'ui_test',
+    status: 'running',
+    startedAt: now,
+    heartbeatAt: now,
+    summary: `Browser validation requested for ${task.title}`,
+  }
+
+  const event: ActivityEvent = {
+    id: crypto.randomUUID(),
+    taskId,
+    projectId: task.projectId,
+    runId,
+    type: 'task_started',
+    title: `${task.id} browser test started`,
+    body: 'UI validation is now required before completion.',
+    createdAt: now,
+    createdBy: 'system',
+  }
+
+  return commit({
+    tasks: state.tasks.map((item) => (item.id === taskId ? { ...item, activeRunId: runId, updatedAt: now, lastEventAt: now } : item)),
+    activity: [event, ...state.activity],
+    runs: [uiRun, ...state.runs],
+  })
+}
+
+export function completeUiTest(state: MissionControlState, taskId: string, passed: boolean): MissionControlState {
+  const task = state.tasks.find((item) => item.id === taskId)
+  if (!task || !task.activeRunId) return state
+  const run = state.runs.find((item) => item.id === task.activeRunId)
+  if (!run || run.kind !== 'ui_test') return state
+  const now = new Date().toISOString()
+
+  if (passed) {
+    const updatedTask: Task = {
+      ...task,
+      status: 'done',
+      activeRunId: undefined,
+      completedAt: now,
+      updatedAt: now,
+      lastEventAt: now,
+    }
+    const updatedRun: Run = {
+      ...run,
+      status: 'passed',
+      endedAt: now,
+      summary: 'Browser validation passed.',
+    }
+    const events: ActivityEvent[] = [
+      {
+        id: crypto.randomUUID(),
+        taskId: task.id,
+        projectId: task.projectId,
+        runId: run.id,
+        type: 'progress',
+        title: `${task.id} browser test passed`,
+        body: 'Required UI/browser validation completed successfully.',
+        createdAt: now,
+        createdBy: 'system',
+      },
+      {
+        id: crypto.randomUUID(),
+        taskId: task.id,
+        projectId: task.projectId,
+        runId: run.id,
+        type: 'done',
+        title: `${task.id} completed after browser validation`,
+        body: 'Task moved to done only after required browser verification passed.',
+        createdAt: now,
+        createdBy: 'system',
+      },
+    ]
+    return commit({
+      tasks: state.tasks.map((item) => (item.id === task.id ? updatedTask : item)),
+      activity: [...events.reverse(), ...state.activity],
+      runs: state.runs.map((item) => (item.id === run.id ? updatedRun : item)),
+    })
+  }
+
+  const bugId = `MC-${state.tasks.length + 1}`
+  const bugTask: Task = {
+    id: bugId,
+    title: `Bug: ${task.title}`,
+    objective: `Fix browser-validation failure for ${task.id}.`,
+    acceptanceCriteria: ['Root cause is fixed', 'Browser validation passes on retry'],
+    boundaries: ['Preserve original task intent'],
+    status: 'triage',
+    projectId: task.projectId,
+    type: 'bug',
+    requiresApproval: false,
+    priority: 'high',
+    createdBy: 'system',
+    source: 'bug_loop',
+    assignee: 'celine',
+    needsUiTest: true,
+    parentTaskId: task.id,
+    plan: [
+      { id: `${bugId}-1`, label: 'Reproduce browser failure', status: 'pending' },
+      { id: `${bugId}-2`, label: 'Fix implementation', status: 'pending' },
+      { id: `${bugId}-3`, label: 'Retest in browser', status: 'pending' },
+    ],
+    lastEventAt: now,
+    createdAt: now,
+    updatedAt: now,
+    specVersionSeen: task.specVersionSeen,
+    requiresSpecUpdate: false,
+    docSyncStatus: 'in_sync',
+    lastDocSyncAt: now,
+  }
+
+  const updatedTask: Task = {
+    ...task,
+    status: 'blocked',
+    activeRunId: undefined,
+    blockerDetail: `Browser validation failed. Follow-up bug ${bugId} created.`,
+    updatedAt: now,
+    lastEventAt: now,
+  }
+
+  const updatedRun: Run = {
+    ...run,
+    status: 'failed',
+    endedAt: now,
+    errorSummary: 'Browser validation failed in local prototype.',
+  }
+
+  const events: ActivityEvent[] = [
+    {
+      id: crypto.randomUUID(),
+      taskId: task.id,
+      projectId: task.projectId,
+      runId: run.id,
+      type: 'ui_test_failed',
+      title: `${task.id} browser test failed`,
+      body: `Required browser validation failed. Bug ${bugId} created.`,
+      createdAt: now,
+      createdBy: 'system',
+    },
+    {
+      id: crypto.randomUUID(),
+      taskId: bugId,
+      projectId: task.projectId,
+      type: 'bug_created',
+      title: `${bugId} created from browser failure`,
+      body: `Follow-up bug created from ${task.id}.`,
+      createdAt: now,
+      createdBy: 'system',
+    },
+  ]
+
+  return commit({
+    tasks: [bugTask, ...state.tasks.map((item) => (item.id === task.id ? updatedTask : item))],
+    activity: [...events.reverse(), ...state.activity],
+    runs: state.runs.map((item) => (item.id === run.id ? updatedRun : item)),
+  })
+}
+
+function finalizeRun(runs: Run[], runId: string, status: 'passed' | 'failed', now: string) {
+  return runs.map((item) =>
+    item.id === runId
+      ? {
+          ...item,
+          status,
+          endedAt: now,
+        }
+      : item,
+  )
 }
 
 function buildTransitionEvent(task: Task, nextStatus: TaskStatus, createdAt: string): ActivityEvent {

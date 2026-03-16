@@ -278,7 +278,10 @@ Avoid mutating completed history unless clearly necessary.
 
 ### 8.1 When UI testing is required
 
-If `needsUiTest = true`, Mission Control should request a dedicated UI test run after implementation completes.
+If `needsUiTest = true`, Mission Control must require a dedicated browser/UI test run before the task is considered truly complete.
+
+For UI-facing work, browser validation is not optional.
+Implementation without browser verification is incomplete.
 
 ### 8.2 UI test run flow
 
@@ -295,10 +298,14 @@ If `needsUiTest = true`, Mission Control should request a dedicated UI test run 
 ### 8.3 Pass case
 
 If UI test passes:
-- emit `ui_test_passed`
+- emit a browser-test success event
 - complete the task
 - emit `done`
 - send completion notification
+
+### 8.3.1 Completion rule for UI work
+
+If `needsUiTest = true`, a task should not be treated as done until browser validation passes.
 
 ### 8.4 Fail case
 
@@ -567,8 +574,10 @@ Mission Control v1 is successful when all of the following are true:
 - progress updates
 
 ### Phase D — QA loop
-- ui test run trigger
-- failure artifacts
+- required browser-test trigger for UI tasks
+- ui_test run records
+- pass/fail task gating
+- failure artifacts (prototype placeholders first)
 - bug auto-creation
 
 ### Phase E — Notifications

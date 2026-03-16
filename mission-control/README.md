@@ -17,8 +17,11 @@ Current state:
 - run records are tracked locally
 - local runner prototype can auto-pick triage work
 - run heartbeat and stale-run simulation are visible in UI
+- UI tasks can start a required browser-test run in the local prototype
+- browser-test pass/fail can gate completion in the local prototype
+- browser-test failure can auto-create a linked bug task in triage
 - state transitions are validated against the canonical state machine
-- activity entries are generated from task creation, edits, transitions, progress updates, and runner actions
+- activity entries are generated from task creation, edits, transitions, progress updates, runner actions, and browser-test actions
 
 Planned focus:
 - Kanban task board

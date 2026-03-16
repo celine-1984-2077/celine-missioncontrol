@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { addProgressEvent, autoPickNextTask, completeStep, createTask, heartbeatRun, loadState, markRunStale, transitionTask, updateTask } from './store'
+import { addProgressEvent, autoPickNextTask, completeStep, completeUiTest, createTask, heartbeatRun, loadState, markRunStale, requestUiTest, transitionTask, updateTask } from './store'
 import type { ActivityEvent, DocSyncStatus, Priority, Task, TaskStatus, TaskType } from './types'
 
 const columns: Array<{ key: TaskStatus; label: string }> = [
@@ -207,6 +207,7 @@ export function App() {
                 <div key={run.id} className="run-card">
                   <div className="meta-row"><strong>{run.id}</strong><span className="pill">{run.kind}</span><span className="pill">{run.status}</span></div>
                   <p className="muted">Task: {run.taskId}</p>
+                  {run.kind === 'ui_test' && <p className="muted">required browser validation</p>}
                   <p className="muted">Heartbeat: {run.heartbeatAt ?? 'n/a'}</p>
                   <div className="transition-row">
                     {run.status === 'running' && <button type="button" className="secondary small-button" onClick={() => setState(heartbeatRun(state, run.id))}>Heartbeat</button>}
@@ -257,6 +258,13 @@ export function App() {
         <section className="detail-panel card">
           <div className="panel-heading"><div><p className="eyebrow">Task Detail</p><h2>{selectedTask.title}</h2></div><div className="meta-row wrap"><span className={`pill ${statusTone[selectedTask.status]}`}>{formatStatus(selectedTask.status)}</span><span className="pill">spec: {selectedTask.specVersionSeen}</span><span className="pill">doc sync: {selectedTask.docSyncStatus}</span></div></div>
           <div className="transition-row">{transitionTargets[selectedTask.status].map((nextStatus) => (<button key={nextStatus} type="button" className="secondary" onClick={() => handleTransition(selectedTask.id, nextStatus)}>Move to {formatStatus(nextStatus)}</button>))}</div>
+          {selectedTask.needsUiTest && (
+            <div className="transition-row">
+              <button type="button" onClick={() => setState(requestUiTest(state, selectedTask.id))}>Start browser test</button>
+              <button type="button" className="secondary" onClick={() => setState(completeUiTest(state, selectedTask.id, true))}>Mark browser test passed</button>
+              <button type="button" className="secondary" onClick={() => setState(completeUiTest(state, selectedTask.id, false))}>Mark browser test failed</button>
+            </div>
+          )}
           <div className="detail-grid">
             <DetailSection title="Edit Task">
               <form className="detail-form" onSubmit={handleUpdateTask}>
