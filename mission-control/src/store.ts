@@ -4,6 +4,8 @@ import type { ActivityEvent, DocSyncStatus, Run, Task, TaskStatus } from './type
 const TASKS_KEY = 'mission-control/tasks'
 const EVENTS_KEY = 'mission-control/events'
 const RUNS_KEY = 'mission-control/runs'
+const STATE_VERSION_KEY = 'mission-control/state-version'
+const STATE_VERSION = 'clear-board-v1'
 
 const allowedTransitions: Record<TaskStatus, TaskStatus[]> = {
   backlog: ['triage'],
@@ -70,13 +72,16 @@ export function loadState(): MissionControlState {
     return { tasks: seedTasks, activity: seedActivity, runs: seedRuns }
   }
 
+  const stateVersion = window.localStorage.getItem(STATE_VERSION_KEY)
   const storedTasks = window.localStorage.getItem(TASKS_KEY)
   const storedEvents = window.localStorage.getItem(EVENTS_KEY)
   const storedRuns = window.localStorage.getItem(RUNS_KEY)
 
-  if (!storedTasks || !storedEvents || !storedRuns) {
-    saveState({ tasks: seedTasks, activity: seedActivity, runs: seedRuns })
-    return { tasks: seedTasks, activity: seedActivity, runs: seedRuns }
+  if (stateVersion !== STATE_VERSION || !storedTasks || !storedEvents || !storedRuns) {
+    const resetState = { tasks: seedTasks, activity: seedActivity, runs: seedRuns }
+    saveState(resetState)
+    window.localStorage.setItem(STATE_VERSION_KEY, STATE_VERSION)
+    return resetState
   }
 
   return {
