@@ -394,7 +394,10 @@ export function App() {
                 <label><span>Snapshot ID</span><input value={reviewDraft.snapshotId} onChange={(e) => setReviewDraft({ ...reviewDraft, snapshotId: e.target.value })} /></label>
                 <label><span>Evidence links (one per line)</span><textarea rows={3} value={reviewDraft.evidenceLinks} onChange={(e) => setReviewDraft({ ...reviewDraft, evidenceLinks: e.target.value })} /></label>
                 <div className="artifact-callout">
-                  <strong>Browser review command</strong>
+                  <div className="meta-row wrap">
+                    <strong>Browser review command</strong>
+                    <button type="button" className="secondary small-button" onClick={() => copyText(`./mission-control/scripts/browser-review.sh ${reviewDraft.targetUrl || 'http://127.0.0.1:4173/'}`)}>Copy command</button>
+                  </div>
                   <code>./mission-control/scripts/browser-review.sh {reviewDraft.targetUrl || 'http://127.0.0.1:4173/'}</code>
                   <p className="muted">Run the harness, then paste the screenshot path, snapshot ID, and any evidence links back here.</p>
                   {selectedTask.requiresUxReview && !selectedTaskUxReady && (
