@@ -541,6 +541,140 @@ export function completeUiTest(state: MissionControlState, taskId: string, passe
   })
 }
 
+
+export function requestReviewRun(state: MissionControlState, taskId: string, kind: 'qa_review' | 'ux_review'): MissionControlState {
+  const task = state.tasks.find((item) => item.id == taskId)
+  if (!task) return state
+  const now = new Date().toISOString()
+  const runId = `RUN-${state.runs.length + 1}`
+  const run: Run = {
+    id: runId,
+    taskId,
+    kind,
+    status: 'running',
+    startedAt: now,
+    heartbeatAt: now,
+    summary: kind === 'qa_review' ? `QA review started for ${task.title}` : `UX review started for ${task.title}`,
+  }
+  const event: ActivityEvent = {
+    id: crypto.randomUUID(),
+    taskId,
+    projectId: task.projectId,
+    runId,
+    type: kind === 'qa_review' ? 'qa_review_requested' : 'ux_review_requested',
+    title: kind === 'qa_review' ? `${task.id} QA review started` : `${task.id} UX review started`,
+    body: kind === 'qa_review'
+      ? 'Separate validation session should verify what was actually implemented.'
+      : 'Separate UX/design session should review usability and visual clarity.',
+    createdAt: now,
+    createdBy: 'system',
+  }
+  return commit({ ...state, runs: [run, ...state.runs], activity: [event, ...state.activity] })
+}
+
+export function completeReviewRun(
+  state: MissionControlState,
+  runId: string,
+  outcome: 'pass' | 'fail' | 'submit',
+): MissionControlState {
+  const run = state.runs.find((item) => item.id === runId)
+  if (!run || (run.kind !== 'qa_review' && run.kind !== 'ux_review')) return state
+  const task = state.tasks.find((item) => item.id === run.taskId)
+  const now = new Date().toISOString()
+
+  const updatedRun: Run = {
+    ...run,
+    status: outcome === 'fail' ? 'failed' : 'passed',
+    endedAt: now,
+    summary:
+      run.kind === 'qa_review'
+        ? outcome === 'pass'
+          ? 'QA review passed.'
+          : 'QA review failed.'
+        : 'UX review submitted.',
+  }
+
+  let extraTasks: Task[] = []
+  let extraEvents: ActivityEvent[] = []
+
+  if (run.kind === 'qa_review' && outcome === 'fail' && task) {
+    const bugId = `MC-${state.tasks.length + 1}`
+    extraTasks.push({
+      id: bugId,
+      title: `QA Bug: ${task.title}`,
+      objective: `Address QA validation issues found after implementing ${task.id}.`,
+      acceptanceCriteria: ['QA issue resolved', 'Validation passes on retry'],
+      boundaries: ['Preserve intended behavior'],
+      status: 'triage',
+      projectId: task.projectId,
+      type: 'bug',
+      requiresApproval: false,
+      priority: 'high',
+      createdBy: 'system',
+      source: 'bug_loop',
+      assignee: 'celine',
+      needsUiTest: task.needsUiTest,
+      parentTaskId: task.id,
+      plan: [
+        { id: `${bugId}-1`, label: 'Review QA findings', status: 'pending' },
+        { id: `${bugId}-2`, label: 'Fix issue', status: 'pending' },
+        { id: `${bugId}-3`, label: 'Re-run validation', status: 'pending' },
+      ],
+      lastEventAt: now,
+      createdAt: now,
+      updatedAt: now,
+      specVersionSeen: task.specVersionSeen,
+      requiresSpecUpdate: false,
+      docSyncStatus: 'in_sync',
+      lastDocSyncAt: now,
+    })
+    extraEvents.push({
+      id: crypto.randomUUID(),
+      taskId: bugId,
+      projectId: task.projectId,
+      type: 'bug_created',
+      title: `${bugId} created from QA review`,
+      body: `Follow-up QA bug created from ${task.id}.`,
+      createdAt: now,
+      createdBy: 'system',
+    })
+  }
+
+  if (run.kind === 'ux_review' && task) {
+    extraEvents.push({
+      id: crypto.randomUUID(),
+      taskId: task.id,
+      projectId: task.projectId,
+      runId: run.id,
+      type: 'ux_review_submitted',
+      title: `${task.id} UX review submitted`,
+      body: 'Use this review output to create polish or improvement tasks.',
+      createdAt: now,
+      createdBy: 'system',
+    })
+  }
+
+  if (run.kind === 'qa_review' && task) {
+    extraEvents.push({
+      id: crypto.randomUUID(),
+      taskId: task.id,
+      projectId: task.projectId,
+      runId: run.id,
+      type: outcome === 'pass' ? 'qa_review_passed' : 'qa_review_failed',
+      title: outcome === 'pass' ? `${task.id} QA review passed` : `${task.id} QA review failed`,
+      body: outcome === 'pass' ? 'Separate QA validation passed.' : 'Separate QA validation failed and requires follow-up.',
+      createdAt: now,
+      createdBy: 'system',
+    })
+  }
+
+  return commit({
+    tasks: [...extraTasks, ...state.tasks],
+    runs: state.runs.map((item) => (item.id === runId ? updatedRun : item)),
+    activity: [...extraEvents.reverse(), ...state.activity],
+  })
+}
+
 function finalizeRun(runs: Run[], runId: string, status: 'passed' | 'failed', now: string) {
   return runs.map((item) =>
     item.id === runId

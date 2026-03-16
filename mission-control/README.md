@@ -20,6 +20,8 @@ Current state:
 - UI tasks can start a required browser-test run in the local prototype
 - browser-test pass/fail can gate completion in the local prototype
 - browser-test failure can auto-create a linked bug task in triage
+- QA review and UX review skeleton runs can be spawned
+- QA review failure can auto-create follow-up bug tasks
 - state transitions are validated against the canonical state machine
 - activity entries are generated from task creation, edits, transitions, progress updates, runner actions, and browser-test actions
 

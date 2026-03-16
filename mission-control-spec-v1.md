@@ -657,6 +657,53 @@ When a user imports an existing project into Mission Control, the system should 
 
 These should appear in the docs surface and become editable, linked project knowledge.
 
+## 13.3 Current roadmap status (Mission Control itself)
+
+### Phase A — Spec + repo bootstrap
+- [x] project scaffold created
+- [x] spec created
+- [x] protocol/bootstrap rules created
+- [x] GitHub repo published
+
+### Phase B — Local single-user engine
+- [x] board UI
+- [x] local task store
+- [x] task creation
+- [x] task editing
+- [x] validated state transitions
+- [x] structured progress logging
+- [x] plan step completion
+
+### Phase C — Runner backbone
+- [x] local run model
+- [x] local auto-pick prototype
+- [x] heartbeat placeholder
+- [x] stale-run simulation
+- [ ] real session-backed execution orchestration
+
+### Phase D — QA loop
+- [x] required browser-test prototype
+- [x] UI test pass/fail gating
+- [x] bug auto-creation prototype
+- [ ] real browser automation harness
+- [ ] screenshots / artifact capture
+- [ ] structured test reports
+
+### Phase E — Multi-session review
+- [ ] qa_review run skeleton in app
+- [ ] ux_review run skeleton in app
+- [ ] review result capture
+- [ ] promote review findings to bug / improvement / spec-update tasks
+
+### Phase F — Notifications
+- [ ] Discord event delivery
+- [ ] anti-spam digesting
+
+### Phase G — Docs / project import
+- [ ] docs surface for imported projects
+- [ ] bootstrap generated specs/protocols/playbooks
+- [ ] db/service analysis doc generation
+
 ## 14. MVP Success Criteria
 
 Mission Control v1 is successful when all of the following are true:

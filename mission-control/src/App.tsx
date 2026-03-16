@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { addProgressEvent, autoPickNextTask, completeStep, completeUiTest, createTask, heartbeatRun, loadState, markRunStale, requestUiTest, transitionTask, updateTask } from './store'
+import { addProgressEvent, autoPickNextTask, completeReviewRun, completeStep, completeUiTest, createTask, heartbeatRun, loadState, markRunStale, requestReviewRun, requestUiTest, transitionTask, updateTask } from './store'
 import type { ActivityEvent, DocSyncStatus, Priority, Task, TaskStatus, TaskType } from './types'
 
 const columns: Array<{ key: TaskStatus; label: string }> = [
@@ -30,6 +30,12 @@ const eventTone: Record<ActivityEvent['type'], string> = {
   done: 'tone-green',
   plan_updated: 'tone-blue',
   runner_error: 'tone-red',
+  qa_review_requested: 'tone-blue',
+  qa_review_passed: 'tone-green',
+  qa_review_failed: 'tone-red',
+  ux_review_requested: 'tone-blue',
+  ux_review_submitted: 'tone-amber',
+  spec_update_requested: 'tone-amber',
 }
 
 const transitionTargets: Record<TaskStatus, TaskStatus[]> = {
@@ -211,7 +217,10 @@ export function App() {
                   <p className="muted">Heartbeat: {run.heartbeatAt ?? 'n/a'}</p>
                   <div className="transition-row">
                     {run.status === 'running' && <button type="button" className="secondary small-button" onClick={() => setState(heartbeatRun(state, run.id))}>Heartbeat</button>}
-                    {run.status === 'running' && <button type="button" className="secondary small-button" onClick={() => setState(markRunStale(state, run.id))}>Mark stale</button>}
+                    {run.status === 'running' && run.kind === 'execution' && <button type="button" className="secondary small-button" onClick={() => setState(markRunStale(state, run.id))}>Mark stale</button>}
+                    {run.status === 'running' && run.kind === 'qa_review' && <button type="button" className="secondary small-button" onClick={() => setState(completeReviewRun(state, run.id, 'pass'))}>QA pass</button>}
+                    {run.status === 'running' && run.kind === 'qa_review' && <button type="button" className="secondary small-button" onClick={() => setState(completeReviewRun(state, run.id, 'fail'))}>QA fail</button>}
+                    {run.status === 'running' && run.kind === 'ux_review' && <button type="button" className="secondary small-button" onClick={() => setState(completeReviewRun(state, run.id, 'submit'))}>Submit UX review</button>}
                   </div>
                 </div>
               ))}
@@ -265,6 +274,10 @@ export function App() {
               <button type="button" className="secondary" onClick={() => setState(completeUiTest(state, selectedTask.id, false))}>Mark browser test failed</button>
             </div>
           )}
+          <div className="transition-row">
+            <button type="button" onClick={() => setState(requestReviewRun(state, selectedTask.id, 'qa_review'))}>Start QA review</button>
+            <button type="button" className="secondary" onClick={() => setState(requestReviewRun(state, selectedTask.id, 'ux_review'))}>Start UX review</button>
+          </div>
           <div className="detail-grid">
             <DetailSection title="Edit Task">
               <form className="detail-form" onSubmit={handleUpdateTask}>

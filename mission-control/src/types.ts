@@ -1,9 +1,9 @@
 export type TaskStatus = 'backlog' | 'triage' | 'in_progress' | 'blocked' | 'done'
-export type TaskType = 'code' | 'doc' | 'research' | 'ops' | 'bug'
+export type TaskType = 'code' | 'doc' | 'research' | 'ops' | 'bug' | 'improvement' | 'spec_update'
 export type Priority = 'low' | 'medium' | 'high' | 'urgent'
 export type StepStatus = 'pending' | 'in_progress' | 'done'
 export type DocSyncStatus = 'in_sync' | 'needs_update' | 'deferred'
-export type RunKind = 'execution' | 'ui_test'
+export type RunKind = 'execution' | 'ui_test' | 'qa_review' | 'ux_review'
 export type RunStatus = 'queued' | 'running' | 'passed' | 'failed' | 'cancelled'
 export type ActivityEventType =
   | 'task_created'
@@ -17,6 +17,12 @@ export type ActivityEventType =
   | 'bug_created'
   | 'done'
   | 'runner_error'
+  | 'qa_review_requested'
+  | 'qa_review_passed'
+  | 'qa_review_failed'
+  | 'ux_review_requested'
+  | 'ux_review_submitted'
+  | 'spec_update_requested'
 
 export interface Step {
   id: string
