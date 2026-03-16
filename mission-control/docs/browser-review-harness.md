@@ -56,6 +56,10 @@ UX review expectation:
 - UI tasks should carry a UX review requirement until a UX review passes
 - push/digest output should make pending UX review visible so unfinished polish is not hidden
 
+Notification bridge:
+- `npm run --workspace mission-control digest` renders Discord-friendly bullet output from JSON task/run/activity state
+- current blocker: this helper still reads a sample/exported state file rather than the browser-local runtime store
+
 ## What the harness should support next
 
 ### QA browser review

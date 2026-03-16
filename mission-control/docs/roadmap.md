@@ -39,6 +39,7 @@ Advance Mission Control from a local board prototype into an autonomous review/d
 - generate compact summaries suitable for Discord push notifications
 - include blockers, next steps, and evidence references
 - avoid noisy pushes by focusing on state changes and review outcomes
+- wire the digest helper to real exported/app state instead of sample JSON
 
 ### 5. Spec/docs sync
 - keep README, roadmap, and harness docs aligned with what the local prototype actually does

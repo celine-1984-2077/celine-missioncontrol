@@ -53,3 +53,11 @@ Build:
 ```bash
 npm run --workspace mission-control build
 ```
+
+Render a notification-ready digest preview from JSON state:
+
+```bash
+npm run --workspace mission-control digest
+# or point at a captured state export
+node ./mission-control/scripts/render-digest.mjs ./path/to/state.json
+```

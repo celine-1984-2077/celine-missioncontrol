@@ -1,0 +1,36 @@
+{
+  "tasks": [
+    {
+      "id": "MC-1",
+      "title": "Build Mission Control app skeleton",
+      "status": "in_progress",
+      "priority": "high",
+      "type": "code",
+      "nextStep": "Wire sample events and doc-sync badges",
+      "blockerDetail": "",
+      "needsUiTest": true,
+      "requiresUxReview": true
+    },
+    {
+      "id": "MC-4",
+      "title": "Connect Discord notification pipeline",
+      "status": "blocked",
+      "priority": "high",
+      "type": "ops",
+      "blockerDetail": "Waiting for app-side notification implementation in a later phase.",
+      "needsUiTest": false,
+      "requiresUxReview": false
+    }
+  ],
+  "activity": [
+    {
+      "taskId": "MC-1",
+      "title": "App skeleton implementation started"
+    },
+    {
+      "taskId": "MC-4",
+      "title": "Notification pipeline blocked"
+    }
+  ],
+  "runs": []
+}
