@@ -335,3 +335,22 @@ button.secondary {
   padding: 6px 10px;
   font-size: 0.82rem;
 }
+
+
+.runner-panel {
+  margin-bottom: 20px;
+}
+
+.runner-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 360px) 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.run-card {
+  background: rgba(10, 15, 31, 0.56);
+  border: 1px solid rgba(130, 152, 228, 0.12);
+  border-radius: 14px;
+  padding: 12px;
+}

@@ -1,8 +1,9 @@
-import { tasks as seedTasks, activity as seedActivity } from './sampleData'
-import type { ActivityEvent, DocSyncStatus, Task, TaskStatus } from './types'
+import { activity as seedActivity, runs as seedRuns, tasks as seedTasks } from './sampleData'
+import type { ActivityEvent, DocSyncStatus, Run, Task, TaskStatus } from './types'
 
 const TASKS_KEY = 'mission-control/tasks'
 const EVENTS_KEY = 'mission-control/events'
+const RUNS_KEY = 'mission-control/runs'
 
 const allowedTransitions: Record<TaskStatus, TaskStatus[]> = {
   backlog: ['triage'],
@@ -15,6 +16,7 @@ const allowedTransitions: Record<TaskStatus, TaskStatus[]> = {
 export interface MissionControlState {
   tasks: Task[]
   activity: ActivityEvent[]
+  runs: Run[]
 }
 
 export interface TaskDraft {
@@ -41,20 +43,22 @@ export interface TaskUpdateInput {
 
 export function loadState(): MissionControlState {
   if (typeof window === 'undefined') {
-    return { tasks: seedTasks, activity: seedActivity }
+    return { tasks: seedTasks, activity: seedActivity, runs: seedRuns }
   }
 
   const storedTasks = window.localStorage.getItem(TASKS_KEY)
   const storedEvents = window.localStorage.getItem(EVENTS_KEY)
+  const storedRuns = window.localStorage.getItem(RUNS_KEY)
 
-  if (!storedTasks || !storedEvents) {
-    saveState({ tasks: seedTasks, activity: seedActivity })
-    return { tasks: seedTasks, activity: seedActivity }
+  if (!storedTasks || !storedEvents || !storedRuns) {
+    saveState({ tasks: seedTasks, activity: seedActivity, runs: seedRuns })
+    return { tasks: seedTasks, activity: seedActivity, runs: seedRuns }
   }
 
   return {
     tasks: JSON.parse(storedTasks) as Task[],
     activity: JSON.parse(storedEvents) as ActivityEvent[],
+    runs: JSON.parse(storedRuns) as Run[],
   }
 }
 
@@ -62,6 +66,7 @@ export function saveState(state: MissionControlState) {
   if (typeof window === 'undefined') return
   window.localStorage.setItem(TASKS_KEY, JSON.stringify(state.tasks))
   window.localStorage.setItem(EVENTS_KEY, JSON.stringify(state.activity))
+  window.localStorage.setItem(RUNS_KEY, JSON.stringify(state.runs))
 }
 
 export function transitionTask(state: MissionControlState, taskId: string, nextStatus: TaskStatus): MissionControlState {
@@ -84,9 +89,10 @@ export function transitionTask(state: MissionControlState, taskId: string, nextS
   }
 
   const event = buildTransitionEvent(task, nextStatus, now)
-  return commit(state, {
+  return commit({
     tasks: state.tasks.map((item) => (item.id === taskId ? updatedTask : item)),
     activity: [event, ...state.activity],
+    runs: state.runs,
   })
 }
 
@@ -133,10 +139,7 @@ export function createTask(state: MissionControlState, draft: TaskDraft): Missio
     createdBy: 'tony',
   }
 
-  return commit(state, {
-    tasks: [newTask, ...state.tasks],
-    activity: [event, ...state.activity],
-  })
+  return commit({ tasks: [newTask, ...state.tasks], activity: [event, ...state.activity], runs: state.runs })
 }
 
 export function updateTask(state: MissionControlState, taskId: string, input: TaskUpdateInput): MissionControlState {
@@ -169,9 +172,10 @@ export function updateTask(state: MissionControlState, taskId: string, input: Ta
     createdBy: 'celine',
   }
 
-  return commit(state, {
+  return commit({
     tasks: state.tasks.map((item) => (item.id === taskId ? updatedTask : item)),
     activity: [event, ...state.activity],
+    runs: state.runs,
   })
 }
 
@@ -191,6 +195,7 @@ export function addProgressEvent(state: MissionControlState, taskId: string, mes
     id: crypto.randomUUID(),
     taskId: task.id,
     projectId: task.projectId,
+    runId: task.activeRunId,
     type: 'progress',
     title: `${task.id} progress update`,
     body: message,
@@ -198,9 +203,10 @@ export function addProgressEvent(state: MissionControlState, taskId: string, mes
     createdBy: 'celine',
   }
 
-  return commit(state, {
+  return commit({
     tasks: state.tasks.map((item) => (item.id === taskId ? updatedTask : item)),
     activity: [event, ...state.activity],
+    runs: state.runs,
   })
 }
 
@@ -232,6 +238,7 @@ export function completeStep(state: MissionControlState, taskId: string, stepId:
     id: crypto.randomUUID(),
     taskId: task.id,
     projectId: task.projectId,
+    runId: task.activeRunId,
     type: 'step_completed',
     title: `${task.id} step completed`,
     body: task.plan[stepIndex]?.label,
@@ -239,9 +246,126 @@ export function completeStep(state: MissionControlState, taskId: string, stepId:
     createdBy: 'celine',
   }
 
-  return commit(state, {
+  return commit({
     tasks: state.tasks.map((item) => (item.id === taskId ? updatedTask : item)),
     activity: [event, ...state.activity],
+    runs: state.runs,
+  })
+}
+
+export function autoPickNextTask(state: MissionControlState): MissionControlState {
+  const candidate = state.tasks.find((task) => task.status === 'triage' && !task.requiresApproval && !task.activeRunId)
+  if (!candidate) return state
+
+  const now = new Date().toISOString()
+  const runId = `RUN-${state.runs.length + 1}`
+  const firstPendingIndex = candidate.plan.findIndex((step) => step.status !== 'done')
+  const nextPlan = candidate.plan.map((step, index) => {
+    if (index === firstPendingIndex && step.status === 'pending') return { ...step, status: 'in_progress' as const }
+    return step
+  })
+
+  const updatedTask: Task = {
+    ...candidate,
+    status: 'in_progress',
+    activeRunId: runId,
+    currentStepIndex: firstPendingIndex >= 0 ? firstPendingIndex : candidate.currentStepIndex,
+    nextStep: nextPlan[firstPendingIndex]?.label ?? candidate.nextStep,
+    updatedAt: now,
+    lastEventAt: now,
+  }
+
+  const run: Run = {
+    id: runId,
+    taskId: candidate.id,
+    kind: 'execution',
+    status: 'running',
+    startedAt: now,
+    heartbeatAt: now,
+    summary: `Auto-picked from triage for ${candidate.title}`,
+  }
+
+  const events: ActivityEvent[] = [
+    {
+      id: crypto.randomUUID(),
+      taskId: candidate.id,
+      projectId: candidate.projectId,
+      runId,
+      type: 'task_picked_up',
+      title: `${candidate.id} picked up from triage`,
+      body: 'Runner selected this task for execution.',
+      createdAt: now,
+      createdBy: 'system',
+    },
+    {
+      id: crypto.randomUUID(),
+      taskId: candidate.id,
+      projectId: candidate.projectId,
+      runId,
+      type: 'task_started',
+      title: `${candidate.id} execution started`,
+      body: `Run ${runId} is now active.`,
+      createdAt: now,
+      createdBy: 'system',
+    },
+  ]
+
+  return commit({
+    tasks: state.tasks.map((task) => (task.id === candidate.id ? updatedTask : task)),
+    activity: [...events.reverse(), ...state.activity],
+    runs: [run, ...state.runs],
+  })
+}
+
+export function heartbeatRun(state: MissionControlState, runId: string): MissionControlState {
+  const run = state.runs.find((item) => item.id === runId)
+  if (!run) return state
+  const now = new Date().toISOString()
+  return commit({
+    ...state,
+    runs: state.runs.map((item) => (item.id === runId ? { ...item, heartbeatAt: now } : item)),
+  })
+}
+
+export function markRunStale(state: MissionControlState, runId: string): MissionControlState {
+  const run = state.runs.find((item) => item.id === runId)
+  if (!run) return state
+  const task = state.tasks.find((item) => item.id === run.taskId)
+  const now = new Date().toISOString()
+
+  const updatedRun: Run = {
+    ...run,
+    status: 'failed',
+    endedAt: now,
+    errorSummary: 'Run marked stale by local prototype check.',
+  }
+
+  const updatedTask = task
+    ? {
+        ...task,
+        status: 'blocked' as const,
+        blockerDetail: 'Run heartbeat went stale in local prototype.',
+        updatedAt: now,
+        lastEventAt: now,
+      }
+    : undefined
+
+  const event: ActivityEvent = {
+    id: crypto.randomUUID(),
+    taskId: run.taskId,
+    projectId: task?.projectId ?? 'mission-control',
+    runId,
+    type: 'runner_error',
+    title: `${run.taskId} run marked stale`,
+    body: 'Prototype stale-run detector moved task to blocked.',
+    createdAt: now,
+    createdBy: 'system',
+  }
+
+  return commit({
+    tasks: updatedTask ? state.tasks.map((item) => (item.id === run.taskId ? updatedTask : item)) : state.tasks,
+    activity: [event, ...state.activity],
+    runs: state.runs.map((item) => (item.id === runId ? updatedRun : item)),
   })
 }
 
@@ -257,6 +381,7 @@ function buildTransitionEvent(task: Task, nextStatus: TaskStatus, createdAt: str
     id: crypto.randomUUID(),
     taskId: task.id,
     projectId: task.projectId,
+    runId: task.activeRunId,
     type: typeMap[nextStatus] ?? 'progress',
     title: `${task.id} moved to ${nextStatus.replace('_', ' ')}`,
     body: `State transition from ${task.status.replace('_', ' ')} to ${nextStatus.replace('_', ' ')}.`,
@@ -265,7 +390,7 @@ function buildTransitionEvent(task: Task, nextStatus: TaskStatus, createdAt: str
   }
 }
 
-function commit(_state: MissionControlState, nextState: MissionControlState): MissionControlState {
+function commit(nextState: MissionControlState): MissionControlState {
   saveState(nextState)
   return nextState
 }

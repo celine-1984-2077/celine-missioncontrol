@@ -559,9 +559,11 @@ Mission Control v1 is successful when all of the following are true:
 - plan step completion UI
 
 ### Phase C — Runner backbone
-- triage polling
-- pickup logic
+- triage pickup logic
 - run tracking
+- local runner prototype controls
+- heartbeat placeholder
+- stale-run simulation / error surfacing
 - progress updates
 
 ### Phase D — QA loop

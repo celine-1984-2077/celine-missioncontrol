@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { addProgressEvent, completeStep, createTask, loadState, transitionTask, updateTask } from './store'
+import { addProgressEvent, autoPickNextTask, completeStep, createTask, heartbeatRun, loadState, markRunStale, transitionTask, updateTask } from './store'
 import type { ActivityEvent, DocSyncStatus, Priority, Task, TaskStatus, TaskType } from './types'
 
 const columns: Array<{ key: TaskStatus; label: string }> = [
@@ -29,6 +29,7 @@ const eventTone: Record<ActivityEvent['type'], string> = {
   bug_created: 'tone-red',
   done: 'tone-green',
   plan_updated: 'tone-blue',
+  runner_error: 'tone-red',
 }
 
 const transitionTargets: Record<TaskStatus, TaskStatus[]> = {
@@ -65,6 +66,7 @@ export function App() {
 
   const tasks = state.tasks
   const activity = state.activity
+  const runs = state.runs
   const nowRunning = useMemo(() => tasks.find((task) => task.status === 'in_progress'), [tasks])
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? nowRunning ?? tasks[0]
   const doneDigest = tasks.filter((task) => task.status === 'done').slice(0, 3)
@@ -187,6 +189,34 @@ export function App() {
           <label className="full-span"><span>Boundaries (optional, one per line)</span><textarea rows={3} value={draft.boundaries} onChange={(e) => setDraft({ ...draft, boundaries: e.target.value })} /></label>
           <div className="full-span actions-row"><button type="submit">Create task</button></div>
         </form>
+      </section>
+
+      <section className="runner-panel card">
+        <div className="panel-heading"><div><p className="eyebrow">Runner Prototype</p><h2>Auto-pick and run tracking</h2></div><span className="pill">local prototype</span></div>
+        <div className="runner-grid">
+          <div className="subpanel">
+            <div className="subpanel-header"><h3>Controls</h3></div>
+            <div className="transition-row">
+              <button type="button" onClick={() => setState(autoPickNextTask(state))}>Auto-pick next triage task</button>
+            </div>
+          </div>
+          <div className="subpanel">
+            <div className="subpanel-header"><h3>Runs</h3><span>{runs.length}</span></div>
+            <div className="digest-list">
+              {runs.map((run) => (
+                <div key={run.id} className="run-card">
+                  <div className="meta-row"><strong>{run.id}</strong><span className="pill">{run.kind}</span><span className="pill">{run.status}</span></div>
+                  <p className="muted">Task: {run.taskId}</p>
+                  <p className="muted">Heartbeat: {run.heartbeatAt ?? 'n/a'}</p>
+                  <div className="transition-row">
+                    {run.status === 'running' && <button type="button" className="secondary small-button" onClick={() => setState(heartbeatRun(state, run.id))}>Heartbeat</button>}
+                    {run.status === 'running' && <button type="button" className="secondary small-button" onClick={() => setState(markRunStale(state, run.id))}>Mark stale</button>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </section>
 
       <main className="layout">

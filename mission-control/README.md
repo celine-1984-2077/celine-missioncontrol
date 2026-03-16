@@ -14,8 +14,11 @@ Current state:
 - task detail editing is wired
 - structured progress updates can be added per task
 - steps can be completed from the plan UI
+- run records are tracked locally
+- local runner prototype can auto-pick triage work
+- run heartbeat and stale-run simulation are visible in UI
 - state transitions are validated against the canonical state machine
-- activity entries are generated from task creation, edits, transitions, and progress updates
+- activity entries are generated from task creation, edits, transitions, progress updates, and runner actions
 
 Planned focus:
 - Kanban task board

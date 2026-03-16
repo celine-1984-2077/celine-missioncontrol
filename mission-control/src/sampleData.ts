@@ -1,4 +1,4 @@
-import type { ActivityEvent, Task } from './types'
+import type { ActivityEvent, Run, Task } from './types'
 
 export const tasks: Task[] = [
   {
@@ -138,6 +138,18 @@ export const tasks: Task[] = [
   },
 ]
 
+export const runs: Run[] = [
+  {
+    id: 'RUN-1',
+    taskId: 'MC-1',
+    kind: 'execution',
+    status: 'running',
+    startedAt: '2026-03-15T22:30:00-07:00',
+    heartbeatAt: '2026-03-15T22:43:00-07:00',
+    summary: 'Building local MVP surfaces',
+  },
+]
+
 export const activity: ActivityEvent[] = [
   {
     id: 'A-1',
@@ -153,6 +165,7 @@ export const activity: ActivityEvent[] = [
     id: 'A-2',
     taskId: 'MC-1',
     projectId: 'mission-control',
+    runId: 'RUN-1',
     type: 'progress',
     title: 'App skeleton implementation started',
     body: 'Building board, activity feed, and structured task detail surface.',
