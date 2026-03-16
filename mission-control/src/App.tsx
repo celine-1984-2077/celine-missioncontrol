@@ -255,8 +255,8 @@ export function App() {
     }
   }
 
-  function formatDigestForCopy(headline: string, lines: string[]) {
-    return [`**${headline}**`, ...lines.map((line) => `- ${line}`)].join('\n')
+  function formatDigestForCopy(headline: string, lines: string[], nextAction?: string) {
+    return [`**${headline}**`, ...lines.map((line) => `- ${line}`), ...(nextAction ? [`- next_action: ${nextAction}`] : [])].join('\n')
   }
 
   return (
@@ -284,7 +284,7 @@ export function App() {
           </div>
           <div className="transition-row compact-actions">
             <button type="button" onClick={handleExportState}>Export state JSON</button>
-            <button type="button" className="secondary" onClick={() => copyText(formatDigestForCopy(boardDigest.headline, boardDigest.lines))}>Copy board digest</button>
+            <button type="button" className="secondary" onClick={() => copyText(formatDigestForCopy(boardDigest.headline, boardDigest.lines, boardDigest.nextAction))}>Copy board digest</button>
           </div>
         </div>
         <p className="muted">Downloads a JSON snapshot that shell helpers can read now. Target file path for the bridge plan: {EXPORT_FILE_PATH}</p>
@@ -359,7 +359,7 @@ export function App() {
           </section>
           <section className="subpanel"><div className="subpanel-header"><h3>Recent Updates</h3></div><div className="timeline">{activity.slice(0, 10).map((event) => (<div key={event.id} className="timeline-item"><div className={`timeline-dot ${eventTone[event.type] ?? 'tone-slate'}`} /><div><div className="timeline-title-row"><strong>{event.title}</strong><span className="task-id">{event.taskId}</span></div>{event.body && <p>{event.body}</p>}<span className="muted small">{event.createdAt}</span></div></div>))}</div></section>
           <section className="subpanel"><div className="subpanel-header"><h3>Done Digest</h3></div><div className="digest-list">{doneDigest.map((task) => (<div key={task.id} className="digest-item"><strong>{task.id}</strong><span>{task.title}</span></div>))}</div></section>
-          <section className="subpanel"><div className="subpanel-header"><h3>Push Digest Preview</h3></div><div className="digest-list">{boardDigest.lines.map((line) => (<div key={line} className="digest-item"><span>{line}</span></div>))}</div></section>
+          <section className="subpanel"><div className="subpanel-header"><h3>Push Digest Preview</h3></div><div className="digest-list">{boardDigest.lines.map((line) => (<div key={line} className="digest-item"><span>{line}</span></div>))}{boardDigest.nextAction && <div className="digest-item"><strong>next action</strong><span>{boardDigest.nextAction}</span></div>}</div></section>
         </aside>
       </main>
 
@@ -473,10 +473,11 @@ export function App() {
                   <article className="artifact-item">
                     <div className="meta-row wrap">
                       <strong>{selectedTaskDigest.headline}</strong>
-                      <button type="button" className="secondary small-button" onClick={() => copyText(formatDigestForCopy(selectedTaskDigest.headline, selectedTaskDigest.lines))}>Copy task digest</button>
+                      <button type="button" className="secondary small-button" onClick={() => copyText(formatDigestForCopy(selectedTaskDigest.headline, selectedTaskDigest.lines, selectedTaskDigest.nextAction))}>Copy task digest</button>
                     </div>
                     <ul>
                       {selectedTaskDigest.lines.map((line) => <li key={line}>{line}</li>)}
+                      {selectedTaskDigest.nextAction && <li><strong>next action:</strong> {selectedTaskDigest.nextAction}</li>}
                     </ul>
                   </article>
                 </div>

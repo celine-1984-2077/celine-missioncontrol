@@ -22,6 +22,7 @@ export interface MissionControlState {
 export interface NotificationDigest {
   headline: string
   lines: string[]
+  nextAction?: string
 }
 
 export interface TaskDraft {
@@ -849,9 +850,16 @@ export function getTaskNotificationDigest(state: MissionControlState, taskId: st
     }
   }
 
+  let nextAction: string | undefined
+  if (task.blockerDetail) nextAction = `Unblock ${task.id}: ${task.blockerDetail}`
+  else if (task.requiresUxReview && !uxReady) nextAction = `Run UX review for ${task.id}`
+  else if (qaEvidence.missingEvidence || uxEvidence.missingEvidence) nextAction = `Attach review evidence for ${task.id}`
+  else if (task.nextStep) nextAction = `${task.id} next: ${task.nextStep}`
+
   return {
     headline: task.status === 'blocked' ? 'Mission Control blocker' : task.status === 'done' ? 'Mission Control completed task' : 'Mission Control update',
     lines,
+    nextAction,
   }
 }
 
@@ -871,6 +879,16 @@ export function getBoardNotificationDigest(state: MissionControlState): Notifica
     .map((task) => ({ task, review: getReviewEvidenceSummary(state, task.id) }))
     .filter(({ review }) => review.latestArtifact?.snapshotId || review.latestArtifact?.screenshotPath)
 
+  const nextAction = blocked[0]?.blockerDetail
+    ? `Resolve blocker on ${blocked[0].id}`
+    : pendingUx[0]
+      ? `Run UX review for ${pendingUx[0].id}`
+      : missingEvidence[0]
+        ? `Attach evidence for ${missingEvidence[0].taskId} ${missingEvidence[0].kind}`
+        : inProgress[0]?.nextStep
+          ? `${inProgress[0].id}: ${inProgress[0].nextStep}`
+          : undefined
+
   return {
     headline: 'Mission Control overnight digest',
     lines: [
@@ -882,6 +900,7 @@ export function getBoardNotificationDigest(state: MissionControlState): Notifica
       ...(inProgress.slice(0, 2).map((task) => `active: ${task.id} next=${task.nextStep ?? 'unset'}`)),
       ...latestEvents,
     ],
+    nextAction,
   }
 }
 

@@ -43,7 +43,7 @@ Advance Mission Control from a local board prototype into an autonomous review/d
 
 ### 4. Notification-ready outputs
 - generate compact summaries suitable for Discord push notifications
-- include blockers, next steps, and evidence references
+- include blockers, next steps, evidence references, and a single recommended next action
 - avoid noisy pushes by focusing on state changes and review outcomes
 - wire the digest helper to real exported/app state instead of sample JSON
 

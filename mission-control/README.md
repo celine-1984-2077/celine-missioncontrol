@@ -66,6 +66,7 @@ node ./mission-control/scripts/render-digest.mjs ./path/to/state.json
 
 The UI now also has a manual **Export state JSON** action for the file-bridge workflow.
 Board/task notification previews can now be copied directly from the UI for push-message handoff.
+Digests now include an explicit `next_action` line so Discord pushes can point to the most important follow-up instead of just reporting state.
 The export panel now also surfaces the current bridge blocker in-app so overnight operators see it without opening docs.
 Review forms now explicitly remind operators when UX review is still required.
 Browser review commands can now be copied directly from the review form.

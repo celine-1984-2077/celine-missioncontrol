@@ -108,6 +108,16 @@ function getBoardNotificationDigest(state) {
     .filter(({ review }) => review.latestArtifact?.snapshotId || review.latestArtifact?.screenshotPath)
   const latestEvents = state.activity.slice(0, 3).map((event) => `${event.taskId}: ${event.title}`)
 
+  const nextAction = blocked[0]?.blockerDetail
+    ? `Resolve blocker on ${blocked[0].id}`
+    : pendingUx[0]
+      ? `Run UX review for ${pendingUx[0].id}`
+      : missingEvidence[0]
+        ? `Attach evidence for ${missingEvidence[0].taskId} ${missingEvidence[0].kind}`
+        : inProgress[0]?.nextStep
+          ? `${inProgress[0].id}: ${inProgress[0].nextStep}`
+          : undefined
+
   return {
     headline: 'Mission Control overnight digest',
     lines: [
@@ -120,6 +130,7 @@ function getBoardNotificationDigest(state) {
       ...inProgress.slice(0, 2).map((task) => `active: ${task.id} next=${task.nextStep || 'unset'}`),
       ...latestEvents,
     ],
+    nextAction,
   }
 }
 
@@ -135,4 +146,7 @@ const digest = getBoardNotificationDigest(state)
 console.log(`**${digest.headline}**`)
 for (const line of digest.lines) {
   console.log(`- ${line}`)
+}
+if (digest.nextAction) {
+  console.log(`- next_action: ${digest.nextAction}`)
 }
