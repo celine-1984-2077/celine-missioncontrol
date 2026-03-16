@@ -43,6 +43,13 @@ Planned focus:
 
 ## Local development
 
+Browser review helper:
+
+```bash
+node mission-control/scripts/ingest-browser-review.mjs /tmp/mission-control-browser-review/latest.json
+```
+
+
 From the workspace root:
 
 ```bash

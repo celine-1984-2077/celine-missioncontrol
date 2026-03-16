@@ -87,3 +87,14 @@ This is still a local harness/prototype.
 The Mission Control app can model QA/UX review runs, but does not yet directly invoke `peekaboo` from inside the app runtime.
 
 That is the next integration step.
+
+
+## Importing browser review output into Mission Control
+
+Convert a `browser-review.sh` JSON artifact into the fields Mission Control expects:
+
+```bash
+node mission-control/scripts/ingest-browser-review.mjs /tmp/mission-control-browser-review/latest.json
+```
+
+Then paste the emitted values into the Review Result Form, or import the original harness JSON directly in the UI.

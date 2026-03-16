@@ -712,6 +712,7 @@ These should appear in the docs surface and become editable, linked project know
 - [x] bug auto-creation prototype
 - [x] initial local browser-review harness verified via Peekaboo
 - [ ] in-app browser harness invocation
+- [x] harness JSON import path for review artifacts
 - [ ] screenshots / artifact capture persistence
 - [ ] structured test reports
 
@@ -724,6 +725,7 @@ These should appear in the docs surface and become editable, linked project know
 - [ ] browser-backed QA review session wiring
 - [ ] browser-backed UX review session wiring
 - [x] review artifact data model and form prototype
+- [x] harness JSON import into review form
 - [x] promote review findings to improvement/spec-update follow-up tasks
 
 ### Phase F — Notifications
