@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+const EXPORT_FILE_PATH = '/tmp/mission-control/state.json'
 import { addProgressEvent, autoPickNextTask, completeReviewRun, completeStep, completeUiTest, createFollowupTask, createTask, getBoardNotificationDigest, getTaskNotificationDigest, hasPassingReview, heartbeatRun, loadState, markRunStale, requestReviewRun, requestUiTest, transitionTask, updateTask } from './store'
 import type { ActivityEvent, DocSyncStatus, Priority, Task, TaskStatus, TaskType } from './types'
 
@@ -187,6 +189,27 @@ export function App() {
     setReviewDraft({ summary: '', findings: '', screenshotPath: '', snapshotId: '', evidenceLinks: '', targetUrl: 'http://127.0.0.1:4173/' })
   }
 
+  function handleExportState() {
+    const payload = {
+      tasks: state.tasks,
+      runs: state.runs,
+      activity: state.activity,
+      exportedAt: new Date().toISOString(),
+      sourceVersion: 'mission-control-local-v1',
+      exportPathHint: EXPORT_FILE_PATH,
+    }
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'mission-control-state.json'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -202,6 +225,17 @@ export function App() {
           <Stat label="Pending UX" value={String(tasks.filter((t) => t.requiresUxReview && !hasPassingReview(state, t.id, 'ux_review')).length)} />
         </div>
       </header>
+
+      <section className="card export-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">State Export</p>
+            <h2>Bridge current board state to shell tools</h2>
+          </div>
+          <button type="button" onClick={handleExportState}>Export state JSON</button>
+        </div>
+        <p className="muted">Downloads a JSON snapshot that shell helpers can read now. Target file path for the bridge plan: {EXPORT_FILE_PATH}</p>
+      </section>
 
       {error && <div className="error-banner">{error}</div>}
 

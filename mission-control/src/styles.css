@@ -219,7 +219,8 @@ h4 { font-size: 0.98rem; }
   border: 1px solid rgba(255, 105, 135, 0.3);
 }
 
-.composer {
+.composer,
+.export-panel {
   margin-bottom: 20px;
 }
 

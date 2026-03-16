@@ -62,3 +62,5 @@ npm run --workspace mission-control digest
 # or point at a captured state export
 node ./mission-control/scripts/render-digest.mjs ./path/to/state.json
 ```
+
+The UI now also has a manual **Export state JSON** action for the file-bridge workflow.
