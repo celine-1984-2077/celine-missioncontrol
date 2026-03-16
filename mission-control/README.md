@@ -78,3 +78,4 @@ Digest output now also reports missing-evidence counts, pending UX gates, the la
 The sample state now includes an evidence-missing UX review so the digest/demo path exercises that signal by default.
 The hardcoded digest fallback now mirrors that same missing-evidence UX review case instead of reporting a cleaner story than the sample path.
 By default, the digest helper now prefers `/tmp/mission-control/state.json` when present before falling back to sample JSON.
+That file is still a target path for the bridge plan, not a file the app refreshes automatically yet.

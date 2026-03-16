@@ -10,6 +10,7 @@ That means:
 - the UI can model runs, reviews, and notification digests
 - the shell/browser-review helpers cannot reliably read current state
 - the digest CLI currently needs sample/exported JSON instead of real runtime state
+- the app's Export action still downloads JSON through the browser instead of refreshing `/tmp/mission-control/state.json`
 
 ## Immediate goal
 
@@ -65,9 +66,9 @@ This keeps the system local-first while unlocking:
 ## Next implementation slice
 
 1. ✅ add `Export state JSON` action in the app
-2. write current state to `/tmp/mission-control/state.json`
+2. ⛔ write current state to `/tmp/mission-control/state.json` (still blocked; export is browser-download-only today)
 3. ✅ update `render-digest.mjs` to default to that file before falling back to sample JSON
-4. document the export path in README and browser-review harness docs
+4. ✅ document the export path in README and browser-review harness docs
 5. ✅ add a narrow review-artifact import helper in the UI for harness JSON
 6. next: replace manual download/import with a stable file write/read bridge
 
