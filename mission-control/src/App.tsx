@@ -446,6 +446,9 @@ export function App() {
                       {run.artifact?.snapshotId && <p className="muted">Snapshot: {run.artifact.snapshotId}</p>}
                       {run.artifact?.screenshotPath && <p className="muted">Screenshot: {run.artifact.screenshotPath}</p>}
                       {run.artifact?.findings && <p className="muted">Findings: {run.artifact.findings}</p>}
+                      {!run.artifact?.screenshotPath && !run.artifact?.snapshotId && !(run.artifact?.evidenceLinks?.length) ? (
+                        <p className="missing-evidence">Missing evidence: no screenshot, snapshot, or evidence links were attached to this review run yet.</p>
+                      ) : null}
                       {run.artifact?.evidenceLinks?.length ? (
                         <ul>
                           {run.artifact.evidenceLinks.map((link) => (

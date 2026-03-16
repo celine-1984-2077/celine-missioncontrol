@@ -67,4 +67,5 @@ The UI now also has a manual **Export state JSON** action for the file-bridge wo
 Board/task notification previews can now be copied directly from the UI for push-message handoff.
 The export panel now also surfaces the current bridge blocker in-app so overnight operators see it without opening docs.
 Review forms now explicitly remind operators when UX review is still required.
+Review artifact cards now flag missing evidence when a QA/UX run has no screenshot, snapshot, or evidence links attached.
 By default, the digest helper now prefers `/tmp/mission-control/state.json` when present before falling back to sample JSON.
