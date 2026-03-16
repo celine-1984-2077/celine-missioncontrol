@@ -89,6 +89,13 @@ export function App() {
   const selectedTaskDigest = selectedTask ? getTaskNotificationDigest(state, selectedTask.id) : undefined
   const selectedTaskQaReady = selectedTask ? hasPassingReview(state, selectedTask.id, 'qa_review') : false
   const selectedTaskUxReady = selectedTask ? (!selectedTask.requiresUxReview || hasPassingReview(state, selectedTask.id, 'ux_review')) : false
+  const missingEvidenceCount = runs.filter((run) =>
+    (run.kind === 'qa_review' || run.kind === 'ux_review') &&
+    run.status !== 'running' &&
+    !run.artifact?.screenshotPath &&
+    !run.artifact?.snapshotId &&
+    !(run.artifact?.evidenceLinks?.length)
+  ).length
 
   const [editDraft, setEditDraft] = useState(() => createEditDraft(selectedTask))
 
@@ -235,6 +242,7 @@ export function App() {
           <Stat label="In Progress" value={String(tasks.filter((t) => t.status === 'in_progress').length)} />
           <Stat label="Needs Doc Sync" value={String(tasks.filter((t) => t.docSyncStatus === 'needs_update').length)} />
           <Stat label="Pending UX" value={String(tasks.filter((t) => t.requiresUxReview && !hasPassingReview(state, t.id, 'ux_review')).length)} />
+          <Stat label="Missing Evidence" value={String(missingEvidenceCount)} />
         </div>
       </header>
 
