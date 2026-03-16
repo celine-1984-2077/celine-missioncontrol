@@ -382,8 +382,10 @@ For important implementation work, especially UI-facing work, Mission Control sh
 2. **ui_test / QA validation**
    - verifies what was actually implemented
    - should inspect the resulting behavior, not just trust builder summaries
+   - should be browser-capable for UI work
 3. **ux_review**
    - evaluates usability, visual hierarchy, and interaction clarity
+   - should be browser-capable for UI work
 
 ### 8.5.1 Why this separation matters
 
@@ -395,6 +397,9 @@ Key rule:
 A task may be implemented, but until QA/browser validation passes, it is not validated.
 
 ### 8.5.2 QA session responsibilities
+
+For UI work, QA review should have real visual access to the running page/application.
+In practice this means a browser-capable harness (for example Peekaboo on macOS in the current local prototype).
 
 A QA session should receive:
 - task id
@@ -414,6 +419,8 @@ A QA session should return:
 - whether a bug or spec-update task should be created
 
 ### 8.5.3 UX review responsibilities
+
+For UI work, UX review should also have real visual access to the running page/application rather than relying only on builder descriptions.
 
 A UX review session should evaluate:
 - usability
@@ -685,15 +692,19 @@ These should appear in the docs surface and become editable, linked project know
 - [x] required browser-test prototype
 - [x] UI test pass/fail gating
 - [x] bug auto-creation prototype
-- [ ] real browser automation harness
-- [ ] screenshots / artifact capture
+- [x] initial local browser-review harness verified via Peekaboo
+- [ ] in-app browser harness invocation
+- [ ] screenshots / artifact capture persistence
 - [ ] structured test reports
 
 ### Phase E — Multi-session review
-- [ ] qa_review run skeleton in app
-- [ ] ux_review run skeleton in app
-- [ ] review result capture
-- [ ] promote review findings to bug / improvement / spec-update tasks
+- [x] qa_review run skeleton in app
+- [x] ux_review run skeleton in app
+- [x] review result capture skeleton
+- [x] promote QA review failure to follow-up bug tasks
+- [ ] promote UX findings to improvement / spec-update tasks
+- [ ] browser-backed QA review session wiring
+- [ ] browser-backed UX review session wiring
 
 ### Phase F — Notifications
 - [ ] Discord event delivery
