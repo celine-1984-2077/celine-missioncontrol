@@ -64,3 +64,4 @@ node ./mission-control/scripts/render-digest.mjs ./path/to/state.json
 ```
 
 The UI now also has a manual **Export state JSON** action for the file-bridge workflow.
+By default, the digest helper now prefers `/tmp/mission-control/state.json` when present before falling back to sample JSON.
