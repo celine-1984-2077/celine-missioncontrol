@@ -265,7 +265,7 @@ export function App() {
         <div>
           <p className="eyebrow">Tony × Celine</p>
           <h1>Mission Control</h1>
-          <p className="subtitle">Phase B+: editable tasks, structured progress updates, and step completion flow.</p>
+          <p className="subtitle">Owner-first Mission Control: needs attention, now running, board, and activity come first.</p>
         </div>
         <div className="topbar-stats">
           <Stat label="Tasks" value={String(tasks.length)} />
@@ -276,25 +276,8 @@ export function App() {
         </div>
       </header>
 
-      <section className="card export-panel">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">State Export</p>
-            <h2>Bridge current board state to shell tools</h2>
-          </div>
-          <div className="transition-row compact-actions">
-            <button type="button" onClick={handleExportState}>Export state JSON</button>
-            <button type="button" className="secondary" onClick={() => copyText(formatDigestForCopy(boardDigest.headline, boardDigest.lines, boardDigest.nextAction))}>Copy board digest</button>
-          </div>
-        </div>
-        <p className="muted">Downloads a JSON snapshot that shell helpers can read now. Target file path for the bridge plan: {EXPORT_FILE_PATH}</p>
-        <p className="bridge-blocker">Current blocker: export is still a manual browser download, so shell tools cannot yet rely on {EXPORT_FILE_PATH} being refreshed automatically.</p>
-      </section>
-
-      {error && <div className="error-banner">{error}</div>}
-
       <section className="runner-panel card">
-        <div className="panel-heading"><div><p className="eyebrow">Runner Prototype</p><h2>Auto-pick and run tracking</h2></div><span className="pill">local prototype</span></div>
+        <div className="panel-heading"><div><p className="eyebrow">Runner Prototype</p><h2>System tooling</h2></div><span className="pill">local prototype</span></div>
         <div className="runner-grid">
           <div className="subpanel">
             <div className="subpanel-header"><h3>Controls</h3></div>
@@ -341,7 +324,10 @@ export function App() {
                       <h4>{task.title}</h4>
                       <p>{task.objective}</p>
                       <div className="meta-row"><span>{task.type}</span><span>{task.priority}</span>{task.needsUiTest && <span>ui test</span>}{task.requiresUxReview && <span>ux review</span>}</div>
-                      <div className="meta-row"><span className={`pill ${task.docSyncStatus === 'needs_update' ? 'tone-red' : task.docSyncStatus === 'deferred' ? 'tone-slate' : 'tone-green'}`}>doc: {task.docSyncStatus ?? 'n/a'}</span>{task.requiresApproval && <span className="pill tone-red">approval</span>}</div>
+                      <div className="meta-row"><span className={`pill ${task.docSyncStatus === 'needs_update' ? 'tone-red' : task.docSyncStatus === 'deferred' ? 'tone-slate' : 'tone-green'}`}>doc: {task.docSyncStatus ?? 'n/a'}</span>{task.requiresApproval && <span className="pill tone-red">approval</span>}{task.requiresUxReview && !hasPassingReview(state, task.id, 'ux_review') && <span className="pill tone-amber">waiting on UX</span>}</div>
+                      <div className="card-signal"><strong>Next:</strong> {task.nextStep ?? 'unset'}</div>
+                      <div className="card-signal"><strong>Last:</strong> {task.lastEventAt}</div>
+                      {task.blockerDetail && <div className="card-signal blocker-signal"><strong>Blocked:</strong> {task.blockerDetail}</div>}
                       <div className="meta-row"><span className={`pill ${getReviewEvidenceSummary(state, task.id).missingEvidence ? 'tone-red' : getReviewEvidenceSummary(state, task.id).latestArtifact ? 'tone-green' : 'tone-slate'}`}>evidence: {getReviewEvidenceSummary(state, task.id).missingEvidence ? 'missing' : getReviewEvidenceSummary(state, task.id).latestArtifact ? 'attached' : 'none'}</span></div>
                     </article>
                   ))}
@@ -362,6 +348,55 @@ export function App() {
           <section className="subpanel"><div className="subpanel-header"><h3>Push Digest Preview</h3></div><div className="digest-list">{boardDigest.lines.map((line) => (<div key={line} className="digest-item"><span>{line}</span></div>))}{boardDigest.nextAction && <div className="digest-item"><strong>next action</strong><span>{boardDigest.nextAction}</span></div>}</div></section>
         </aside>
       </main>
+
+      <section className="card export-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">State Export</p>
+            <h2>Bridge current board state to shell tools</h2>
+          </div>
+          <div className="transition-row compact-actions">
+            <button type="button" onClick={handleExportState}>Export state JSON</button>
+            <button type="button" className="secondary" onClick={() => copyText(formatDigestForCopy(boardDigest.headline, boardDigest.lines, boardDigest.nextAction))}>Copy board digest</button>
+          </div>
+        </div>
+        <p className="muted">Downloads a JSON snapshot that shell helpers can read now. Target file path for the bridge plan: {EXPORT_FILE_PATH}</p>
+        <p className="bridge-blocker">Current blocker: export is still a manual browser download, so shell tools cannot yet rely on {EXPORT_FILE_PATH} being refreshed automatically.</p>
+      </section>
+
+      {error && <div className="error-banner">{error}</div>}
+
+      <section className="card priority-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Needs Attention</p>
+            <h2>What Tony should look at first</h2>
+          </div>
+          <span className="pill tone-amber">owner-first</span>
+        </div>
+        <div className="priority-grid">
+          <div className="priority-card">
+            <strong>Blocked</strong>
+            <span>{tasks.filter((task) => task.status === 'blocked').length}</span>
+            <p className="muted">Tasks that cannot move without intervention.</p>
+          </div>
+          <div className="priority-card">
+            <strong>Pending UX</strong>
+            <span>{tasks.filter((task) => task.requiresUxReview && !hasPassingReview(state, task.id, 'ux_review')).length}</span>
+            <p className="muted">UI work that still needs UX eyes before it is trustworthy.</p>
+          </div>
+          <div className="priority-card">
+            <strong>Missing Evidence</strong>
+            <span>{missingEvidenceCount}</span>
+            <p className="muted">Completed reviews without screenshot, snapshot, or evidence links.</p>
+          </div>
+          <div className="priority-card">
+            <strong>Next Action</strong>
+            <span>{boardDigest.nextAction ?? 'No urgent action'}</span>
+            <p className="muted">The clearest system-suggested next move right now.</p>
+          </div>
+        </div>
+      </section>
 
       <section className="composer card">
         <div className="panel-heading">
@@ -402,7 +437,27 @@ export function App() {
             <button type="button" className="secondary" onClick={() => setState(requestReviewRun(state, selectedTask.id, 'ux_review'))}>Start UX review</button>
           </div>
           <div className="detail-grid">
-            <DetailSection title="Edit Task">
+            <DetailSection title="Overview">
+              <div className="artifact-list">
+                <article className="artifact-item">
+                  <strong>Status</strong>
+                  <p>{formatStatus(selectedTask.status)}</p>
+                </article>
+                <article className="artifact-item">
+                  <strong>Next step</strong>
+                  <p>{selectedTask.nextStep ?? "Not set"}</p>
+                </article>
+                <article className="artifact-item">
+                  <strong>Needs Tony?</strong>
+                  <p>{selectedTask.requiresApproval ? "Yes — approval required" : selectedTask.blockerDetail ? "Maybe — see blocker" : "No immediate owner action"}</p>
+                </article>
+                <article className="artifact-item">
+                  <strong>Latest review evidence</strong>
+                  <p>{selectedTaskEvidence?.latestEvidenceLabel ?? "No evidence yet"}</p>
+                </article>
+              </div>
+            </DetailSection>
+            <DetailSection title="Decision / Edit">
               <form className="detail-form" onSubmit={handleUpdateTask}>
                 <label><span>Title</span><input value={editDraft.title} onChange={(e) => setEditDraft({ ...editDraft, title: e.target.value })} /></label>
                 <label><span>Objective</span><textarea rows={3} value={editDraft.objective} onChange={(e) => setEditDraft({ ...editDraft, objective: e.target.value })} /></label>
