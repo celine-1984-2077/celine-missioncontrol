@@ -70,4 +70,5 @@ Review forms now explicitly remind operators when UX review is still required.
 Browser review commands can now be copied directly from the review form.
 Review artifact cards now flag missing evidence when a QA/UX run has no screenshot, snapshot, or evidence links attached.
 The dashboard now counts completed review runs that are still missing evidence.
+Digest output now also reports missing-evidence counts and names the first incomplete review runs.
 By default, the digest helper now prefers `/tmp/mission-control/state.json` when present before falling back to sample JSON.

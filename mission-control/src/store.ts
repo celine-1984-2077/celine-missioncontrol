@@ -807,13 +807,21 @@ export function getBoardNotificationDigest(state: MissionControlState): Notifica
   const blocked = state.tasks.filter((task) => task.status === 'blocked')
   const inProgress = state.tasks.filter((task) => task.status === 'in_progress')
   const pendingUx = state.tasks.filter((task) => task.requiresUxReview && !hasPassingReview(state, task.id, 'ux_review'))
+  const missingEvidence = state.runs.filter((run) =>
+    (run.kind === 'qa_review' || run.kind === 'ux_review') &&
+    run.status !== 'running' &&
+    !run.artifact?.screenshotPath &&
+    !run.artifact?.snapshotId &&
+    !(run.artifact?.evidenceLinks?.length)
+  )
   const latestEvents = state.activity.slice(0, 3).map((event) => `${event.taskId}: ${event.title}`)
 
   return {
     headline: 'Mission Control overnight digest',
     lines: [
-      `in_progress=${inProgress.length} blocked=${blocked.length} pending_ux=${pendingUx.length}`,
+      `in_progress=${inProgress.length} blocked=${blocked.length} pending_ux=${pendingUx.length} missing_evidence=${missingEvidence.length}`,
       ...(blocked.slice(0, 2).map((task) => `blocked: ${task.id} ${task.blockerDetail ?? task.title}`)),
+      ...(missingEvidence.slice(0, 2).map((run) => `missing evidence: ${run.taskId} ${run.kind} ${run.id}`)),
       ...(inProgress.slice(0, 2).map((task) => `active: ${task.id} next=${task.nextStep ?? 'unset'}`)),
       ...latestEvents,
     ],
